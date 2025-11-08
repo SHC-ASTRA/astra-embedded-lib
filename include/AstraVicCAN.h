@@ -238,7 +238,7 @@ class VicCanFrame {
                (static_cast<uint64_t>(data[5]) << 16) |
                (static_cast<uint64_t>(data[6]) << 8) |
                (static_cast<uint64_t>(data[7]) << 0);
-            outData.push_back(static_cast<double>(*reinterpret_cast<double*>(&udata)));  // shut up, ik
+            outData.push_back(static_cast<double>(*reinterpret_cast<double*>(&udata)));  // shut up, ik T-T
         }
         else if (dataType == CanDataType::DT_2f32) {  // 2 floats
             uint32_t udata =
