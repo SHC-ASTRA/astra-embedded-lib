@@ -87,7 +87,7 @@ void AstraMotors::UpdateForAcceleration() {
             || (direction() == -1 && status2.sensorPosition < targetPos + 1))
         {
             stop();
-#   ifdef DEBUG
+#   ifdef MOTOR_DEBUG
             Serial.println("Stopping rotation.");
 #   endif
         }
@@ -209,7 +209,7 @@ void AstraMotors::turnByDeg(float deg) {
     rotatingToPos = true;
     targetPos = status2.sensorPosition + ((deg / 360.0) * gearBox);
 
-#ifdef DEBUG
+#ifdef MOTOR_DEBUG
     Serial.print("Turning to pos: ");
     Serial.println(targetPos);
 #endif

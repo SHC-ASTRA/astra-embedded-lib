@@ -22,7 +22,7 @@ void CAN_enumerate() {
 }
 
 void CAN_sendControl(uint8_t deviceId, sparkMax_ctrlType ctrlType, float value) {
-    // DO NOT USE THE NEW CAN FUNCTIONS FOR THIS (specifically duty cycle). SEE COMMENT BELOW.
+    // USE THIS AND NOT THE NEW CAN FUNCTIONS FOR THIS (specifically duty cycle). SEE COMMENT BELOW.
 
     CanFrame msg = {0};
     msg.identifier = 0x2050000 + deviceId;
@@ -103,7 +103,7 @@ void CAN_sendPacket(uint8_t deviceId, int32_t apiId, uint8_t data[], uint8_t dat
     createdId |= (apiId & 0x3FF) << 6;
     createdId |= (deviceId & 0x3F);
 
-#ifdef DEBUG
+#ifdef MOTOR_DEBUG
     if (apiId != 0xB2) {  // Don't spam the serial monitor with heartbeats
         Serial.print("Sending to ");
         Serial.print(createdId, HEX);
