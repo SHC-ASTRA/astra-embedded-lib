@@ -450,7 +450,7 @@ class VicCanController {
         // Check for queued frame from relayFromSerial()
         if (relayFrameWaiting) {
             relayFrameWaiting = false;
-#ifdef DEBUG
+#ifdef VICCAN_DEBUG
             Serial.println("Using frame waiting from serial relay");
 #endif
             return true;  // Use inVicCanFrame already set by relayFromSerial()
@@ -461,7 +461,7 @@ class VicCanController {
         if (!inVicCanFrame.readCan())
             return false;  // No CAN frame received
 
-#   ifdef DEBUG
+#   ifdef VICCAN_DEBUG
         Serial.println("Received CAN frame: ");
         Serial.println(inVicCanFrame.toStr());
 #   endif
@@ -469,7 +469,7 @@ class VicCanController {
         // Relay stray CAN frames to Serial if relayMode is on
         if (!inVicCanFrame.isForMe()) {
             if (relayMode) {
-#   ifdef DEBUG
+#   ifdef VICCAN_DEBUG
                 Serial.println("Relaying from CAN to Serial:");
                 Serial.println(inVicCanFrame.toStr());
 #   endif
@@ -590,21 +590,20 @@ class VicCanController {
         if (outVicFrame.mcuId == SUBMODULE_CAN_ID || outVicFrame.mcuId == McuId::MCU_BROADCAST) {
             relayFrameWaiting = true;
             inVicCanFrame = outVicFrame;
-#ifdef DEBUG
+#ifdef VICCAN_DEBUG
             Serial.println("Queuing frame from Serial.");
 #endif
-        }
+        }  // purposefully no else
 
 #ifdef CAN_AVAILABLE
-        // If this CAN frame is not for this MCU, relay it to the CAN network
+        // If this CAN frame is not specifically for this MCU, relay it to the CAN network (includes broadcast messages)
         if (outVicFrame.mcuId != SUBMODULE_CAN_ID) {
-#   ifdef DEBUG
+#   ifdef VICCAN_DEBUG
             Serial.println("Relaying from Serial to CAN:");
-            printCANframe(outVicFrame.toStr());
+            Serial.println(outVicFrame.toStr());
 #   endif
             outVicFrame.sendCan();
         }
-        // purposefully no else
 #endif
     }
 
@@ -683,7 +682,7 @@ class VicCanController {
 #ifdef CAN_AVAILABLE
         if (relayMode) {
 #endif
-#ifdef DEBUG
+#ifdef VICCAN_DEBUG
             Serial.println("Relaying from CAN to Serial:");
             Serial.println(outVicFrame.toStr());
 #endif
@@ -691,7 +690,7 @@ class VicCanController {
 #ifdef CAN_AVAILABLE
         }
         else {
-#   ifdef DEBUG
+#   ifdef VICCAN_DEBUG
             Serial.println("Sending CAN frame:");
             Serial.println(outVicFrame.toStr());
 #   endif
