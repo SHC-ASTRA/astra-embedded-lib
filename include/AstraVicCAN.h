@@ -596,7 +596,7 @@ class VicCanController {
         }  // purposefully no else
 
 #ifdef CAN_AVAILABLE
-        // If this CAN frame is not for this MCU, relay it to the CAN network
+        // If this CAN frame is not specifically for this MCU, relay it to the CAN network (includes broadcast messages)
         if (outVicFrame.mcuId != SUBMODULE_CAN_ID) {
 #   ifdef VICCAN_DEBUG
             Serial.println("Relaying from Serial to CAN:");
