@@ -446,32 +446,42 @@ class VicCanController {
         }
 
 #ifdef CAN_AVAILABLE
-        // Check CAN network for a frame
-        if (!inVicCanFrame.readCan())
-            return false;  // No CAN frame received
+        // Run through up to 5 messages on the CAN network.
+        // If one is found to act on, break and return true.
+        // If a read fails, there are no more messages to read; return false.
+        // If a message is found that is not for us, relay if needed continue.
+        // Failing to read a message (no more in queue) or finding a message we need to act on
+        //    are the only cases where we break.
+        // If count expires (processed 5 messages without finding one to act on), return false.
+        int count = 0;
+        while (count++, count < 5) {
+            // Check CAN network for a frame
+            if (!inVicCanFrame.readCan())
+                return false;  // No CAN frame received
 
 #   ifdef VICCAN_DEBUG
-        Serial.println("Received CAN frame: ");
-        Serial.println(inVicCanFrame.toStr());
+            Serial.println("Received CAN frame: ");
+            Serial.println(inVicCanFrame.toStr());
 #   endif
 
-        // Relay stray CAN frames to Serial if relayMode is on
-        if (!inVicCanFrame.isForMe()) {
-            if (relayMode) {
+            // Relay stray CAN frames to Serial if relayMode is on
+            // Broadcast messages are specifically not relayed.
+            if (!inVicCanFrame.isForMe()) {
+                if (relayMode) {
 #   ifdef VICCAN_DEBUG
-                Serial.println("Relaying from CAN to Serial:");
-                Serial.println(inVicCanFrame.toStr());
+                    Serial.println("Relaying from CAN to Serial:");
+                    Serial.println(inVicCanFrame.toStr());
 #   endif
-                relayToSerial(inVicCanFrame);
+                    relayToSerial(inVicCanFrame);
+                }
+                continue;  // Not for us; try to process the next message
             }
-            return false;  // Not for this MCU
-        }
 
-        // We have a CAN command that we should act on.
-        return true;
-#else
-        return false;
+            // We have a CAN command that we should act on.
+            return true;
+        }
 #endif
+        return false;
     }
 
     /**
