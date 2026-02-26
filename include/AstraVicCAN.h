@@ -22,6 +22,12 @@
 
 #if (defined(ESP32) && __has_include("ESP32-TWAI-CAN.hpp"))
 #   define CAN_AVAILABLE
+#else
+#   warning "Could not find a compatible MCU CAN library. VicCAN will be limited to Serial use."
+#endif
+
+#ifdef VICAN_DEBUG
+#   warning "VICAN_DEBUG is enabled. good luck soldier."
 #endif
 
 // Microcontroller VicCAN ID's based on submodule; use these instead of the raw numbers
@@ -55,19 +61,8 @@ enum class CanDataType : uint8_t {
     DT_1f64 = 0,
     DT_2f32,
     DT_4i16,
-    DT_8i8
+    DT_NONE
 };
-
-/**
- * @brief Which datatype ID to use for no data; corresponds to dlc = 0.
- *
- * This is here to attempt to allow arbitration to work even the rest of the CAN ID is the same;
- * ideally, there will not be CAN frames with identical IDs being sent by two different sources
- * at the same time. If the relay requests telemetry at the same time a MCU provides it,
- * the DT should be different so that instead of an error, arbitration can use the different DT
- * to decide which frame should be sent first.
- */
-#define DT_NA CanDataType::DT_8i8
 
 // Command IDs for VicCAN frames
 enum CanCmdId : uint8_t {
@@ -197,7 +192,7 @@ class VicCanFrame {
      */
     void clear() {
         mcuId = McuId::MCU_BROADCAST;
-        dataType = DT_NA;
+        dataType = CanDataType::DT_NONE;
         cmdId = 0;
         rtr = false;
         dlc = 0;
@@ -225,7 +220,7 @@ class VicCanFrame {
         // Once each number has been constructed byte-by-byte, we can re-interpret_cast it
         // to the desired type. (then static_cast everything to a double for consistency)
 
-        if (dlc == 0) {
+        if (dlc == 0 || dataType == CanDataType::DT_NONE) {
             // No data to parse
         }
         else if (dataType == CanDataType::DT_1f64) {  // 1 double
@@ -271,12 +266,6 @@ class VicCanFrame {
                (static_cast<uint16_t>(data[6]) << 8) |
                (static_cast<uint16_t>(data[7]) << 0);
             outData.push_back(static_cast<double>(*reinterpret_cast<int16_t*>(&udata)));
-        }
-        // TODO: this does not do what it is supposed to do, unless the 8 ints should be unsigned
-        else if (dataType == CanDataType::DT_8i8) {  // 8 ints
-            for (int i = 0; i < 8; i++) {
-                outData.push_back(static_cast<double>(data[i]));
-            }
         }
     }
 
@@ -457,32 +446,42 @@ class VicCanController {
         }
 
 #ifdef CAN_AVAILABLE
-        // Check CAN network for a frame
-        if (!inVicCanFrame.readCan())
-            return false;  // No CAN frame received
+        // Run through up to 5 messages on the CAN network.
+        // If one is found to act on, break and return true.
+        // If a read fails, there are no more messages to read; return false.
+        // If a message is found that is not for us, relay if needed continue.
+        // Failing to read a message (no more in queue) or finding a message we need to act on
+        //    are the only cases where we break.
+        // If count expires (processed 5 messages without finding one to act on), return false.
+        int count = 0;
+        while (count++, count < 5) {
+            // Check CAN network for a frame
+            if (!inVicCanFrame.readCan())
+                return false;  // No CAN frame received
 
 #   ifdef VICCAN_DEBUG
-        Serial.println("Received CAN frame: ");
-        Serial.println(inVicCanFrame.toStr());
+            Serial.println("Received CAN frame: ");
+            Serial.println(inVicCanFrame.toStr());
 #   endif
 
-        // Relay stray CAN frames to Serial if relayMode is on
-        if (!inVicCanFrame.isForMe()) {
-            if (relayMode) {
+            // Relay stray CAN frames to Serial if relayMode is on
+            // Broadcast messages are specifically not relayed.
+            if (!inVicCanFrame.isForMe()) {
+                if (relayMode) {
 #   ifdef VICCAN_DEBUG
-                Serial.println("Relaying from CAN to Serial:");
-                Serial.println(inVicCanFrame.toStr());
+                    Serial.println("Relaying from CAN to Serial:");
+                    Serial.println(inVicCanFrame.toStr());
 #   endif
-                relayToSerial(inVicCanFrame);
+                    relayToSerial(inVicCanFrame);
+                }
+                continue;  // Not for us; try to process the next message
             }
-            return false;  // Not for this MCU
-        }
 
-        // We have a CAN command that we should act on.
-        return true;
-#else
-        return false;
+            // We have a CAN command that we should act on.
+            return true;
+        }
 #endif
+        return false;
     }
 
     /**
@@ -559,7 +558,11 @@ class VicCanController {
         if (args.size() > 3) {  // Add data to VicCanFrame if we have it; if not, default is no data
             outVicFrame.dlc = 8;
 
-            /**/ if (args.size() - 3 == 1) {
+            if (args.size() - 3 == 0) {
+                outVicFrame.dataType = CanDataType::DT_NONE;
+                outVicFrame.dlc = 0;  // No data to encode
+            }
+            else if (args.size() - 3 == 1) {
                 outVicFrame.dataType = CanDataType::DT_1f64;
                 encodeData(outVicFrame.data, args[3].toDouble());
             }
@@ -575,11 +578,6 @@ class VicCanController {
                 outVicFrame.dataType = CanDataType::DT_4i16;
                 encodeData(outVicFrame.data, args[3].toInt(), args[4].toInt(), args[5].toInt(), args[6].toInt());
             }
-            else if (args.size() - 3 == 8) {
-                outVicFrame.dataType = CanDataType::DT_8i8;
-                encodeData(outVicFrame.data, args[3].toInt(), args[4].toInt(), args[5].toInt(), args[6].toInt(),
-                           args[7].toInt(), args[8].toInt(), args[9].toInt(), args[10].toInt());
-            }
             else {
                 Serial.println("Invalid data length");
                 return;
@@ -593,7 +591,7 @@ class VicCanController {
 #ifdef VICCAN_DEBUG
             Serial.println("Queuing frame from Serial.");
 #endif
-        }  // purposefully no else
+        }  // Continue; we may still need to relay it to the CAN network
 
 #ifdef CAN_AVAILABLE
         // If this CAN frame is not specifically for this MCU, relay it to the CAN network (includes broadcast messages)
@@ -655,19 +653,6 @@ class VicCanController {
         canData[7] = udata & 0xFF;
     }
 
-    // DT_8i8 -- 8 ints
-    void encodeData(uint8_t canData[8], int8_t data1, int8_t data2, int8_t data3, int8_t data4, int8_t data5,
-                    int8_t data6, int8_t data7, int8_t data8) {
-        canData[0] = *reinterpret_cast<uint8_t*>(&data1);
-        canData[1] = *reinterpret_cast<uint8_t*>(&data2);
-        canData[2] = *reinterpret_cast<uint8_t*>(&data3);
-        canData[3] = *reinterpret_cast<uint8_t*>(&data4);
-        canData[4] = *reinterpret_cast<uint8_t*>(&data5);
-        canData[5] = *reinterpret_cast<uint8_t*>(&data6);
-        canData[6] = *reinterpret_cast<uint8_t*>(&data7);
-        canData[7] = *reinterpret_cast<uint8_t*>(&data8);
-    }
-
 
     //------------------------//
     // Sending to Basestation //
@@ -721,14 +706,6 @@ class VicCanController {
         sendFrame(outVicFrame, cmdId);
     }
 
-    void send(uint8_t cmdId, int8_t data1, int8_t data2, int8_t data3, int8_t data4, int8_t data5, int8_t data6 = 0,
-              int8_t data7 = 0, int8_t data8 = 0) {
-        VicCanFrame outVicFrame;
-        outVicFrame.dataType = CanDataType::DT_8i8;
-        encodeData(outVicFrame.data, data1, data2, data3, data4, data5, data6, data7, data8);
-        sendFrame(outVicFrame, cmdId);
-    }
-
 
     inline void respond(double data) {
         send(inVicCanFrame.cmdId, data);
@@ -740,10 +717,5 @@ class VicCanController {
 
     inline void respond(int16_t data1, int16_t data2, int16_t data3, int16_t data4 = 0) {
         send(inVicCanFrame.cmdId, data1, data2, data3, data4);
-    }
-
-    inline void respond(int8_t data1, int8_t data2, int8_t data3, int8_t data4, int8_t data5,
-                        int8_t data6 = 0, int8_t data7 = 0, int8_t data8 = 0) {
-        send(inVicCanFrame.cmdId, data1, data2, data3, data4, data5, data6, data7, data8);
     }
 } vicCAN;

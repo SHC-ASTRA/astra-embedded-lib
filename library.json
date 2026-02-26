@@ -1,11 +1,12 @@
 {
-    "name": "rover-Embedded-Lib",
-    "version": "0.7.0",
+    "$schema": "https://raw.githubusercontent.com/platformio/platformio-core/develop/platformio/assets/schema/library.json",
+    "name": "astra-Embedded-Lib",
+    "version": "1.0.1",
     "description": "ASTRA's library for embedded code",
     "repository":
     {
         "type": "git",
-        "url": "https://github.com/SHC-ASTRA/rover-Embedded-Lib"
+        "url": "https://github.com/SHC-ASTRA/astra-Embedded-Lib"
     },
     "authors":
     [
@@ -26,5 +27,9 @@
             "name": "Karl"
         }
     ],
-    "frameworks": "arduino"
+    "license": "AGPL-3.0-only",
+    "frameworks": "arduino",
+    "build": {
+        "extraScript": "extra_script.py"
+    }
 }
