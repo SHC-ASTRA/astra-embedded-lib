@@ -17,8 +17,6 @@ class AstraMotors {
     bool inverted;  // Inverts the speed of the motor, this should be true for right wheels
 
     int currentMotorSpeed;  // Current speed of the motor
-    int targetMotorSpeed;   // What the speed of the motor should be
-    float speedAccel;
     int maxSpeed;
 
     float currentDutyCycle;
@@ -43,11 +41,10 @@ class AstraMotors {
      * @brief Default constructor for a REV motor controller
      *
      * @param setMotorID REV motor ID for this motor
-     * @param setCtrlMode Either CTRL_SPEED or CTRL_DUTYCYCLE for controlling via RPM or percent speed
      * @param SetInverted Whether or not to invert the motor's direction (used for right wheels)
      * @param SetGearBox Gearbox ratio attached to motor; e.g. for 64:1, use 64
      */
-    AstraMotors(int setMotorID = 0, sparkMax_ctrlType setCtrlMode = sparkMax_ctrlType::kDutyCycle, bool SetInverted = false, int setGearBox = 1);
+    AstraMotors(int setMotorID = 0, bool SetInverted = false, int setGearBox = 1);
 
 
     //---------------------------------------------//
@@ -103,9 +100,6 @@ class AstraMotors {
     //---------------------------------------------//
 
     void setDuty(float val);  // Set the targetDutyCycle variable; will be enacted via accelerate()
-    void setSpeed(float val);  // Set the targetMotorSpeed variable; will be enacted via accelerate()
-
-    void UpdateForAcceleration();  // Update the current speed to try and match targetMotorSpeed
 
     void parseStatus(uint32_t apiId, uint8_t frameIn[]);  // Parse a status frame from 8-byte CAN data and REV API ID
     void parseStatus0(uint8_t frameIn[]);
@@ -141,8 +135,7 @@ class AstraMotors {
 
     // No acceleration for current control
     inline void sendCurrent(float val) {
-        if (controlMode != sparkMax_ctrlType::kCurrent)
-            return;
+        controlMode = sparkMax_ctrlType::kCurrent;
         CAN_sendControl(motorID, sparkMax_ctrlType::kCurrent, val);
     }
 
