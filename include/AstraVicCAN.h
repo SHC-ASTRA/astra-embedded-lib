@@ -98,6 +98,7 @@ enum CanCmdId : uint8_t {
     CMD_FAERIE_UVLED,
     CMD_ARM_MANUAL,
     CMD_CITADEL_FAN_CTRL,
+    CMD_FIRE_LIBS,
     // Data request
     CMD_GNSS_LAT = 48,
     CMD_GNSS_LON,
@@ -112,7 +113,7 @@ enum CanCmdId : uint8_t {
 
 /**
  * @brief Takes a MCU name in string form (i.e., "core"), and turns it into a MCU ID enum, if valid
- * 
+ *
  * @param str String containing only the MCU name, all lower case
  * @param mcuID McuId enum output corresponding to MCU name, if valid
  * @return true on valid MCU name;
@@ -123,7 +124,7 @@ bool mcuIdFromString(String str, McuId* mcuID) {
         return false;
 
     str.toLowerCase();  // Make it case-insensitive
-    
+
     if (str == "broadcast")
         *mcuID = McuId::MCU_BROADCAST;
     else if (str == "core")
@@ -138,13 +139,13 @@ bool mcuIdFromString(String str, McuId* mcuID) {
         *mcuID = McuId::MCU_CITADEL;
     else
         return false;
-    
+
     return true;
 }
 
 /**
  * @brief Takes a MCU ID enum and converts it into a MCU name in String form (i.e., "core")
- * 
+ *
  * @param mcuID MCU ID enum
  * @return String containing only the name of the MCU
  */
@@ -193,7 +194,7 @@ class VicCanFrame {
 
     /**
      * @brief Resets all data values; mainly for use with static keyword
-     * 
+     *
      */
     void clear() {
         mcuId = McuId::MCU_BROADCAST;
@@ -282,8 +283,8 @@ class VicCanFrame {
 
     /**
      * @brief Represents the VicCanFrame as a string; for use with Serial.println()
-     * 
-     * @return String 
+     *
+     * @return String
      */
     String toStr() {
         String res;
@@ -306,7 +307,7 @@ class VicCanFrame {
 
     /**
      * @brief Whether this mcu should care about this CAN frame
-     * 
+     *
      * @return true if the frame's MCU ID matches ours or is a broadcast;
      * @return false if the frame is intended for a different mcu only.
      */
@@ -317,7 +318,7 @@ class VicCanFrame {
 
     /**
      * @brief Take a CAN ID and parse it into its components
-     * 
+     *
      * @param id The 11-bit CAN ID to parse
      */
     void parseCanId(uint32_t id) {
@@ -329,7 +330,7 @@ class VicCanFrame {
 #ifdef CAN_AVAILABLE
     /**
      * @brief Take a CanFrame (typically from ESP32Can.read()) and parse it into its components
-     * 
+     *
      * @param frame CanFrame to parse
      */
     void parseCanFrame(CanFrame& frame) {
@@ -346,7 +347,7 @@ class VicCanFrame {
 #ifdef CAN_AVAILABLE
     /**
      * @brief Read the CAN network for a frame; automatically parses into the VicCanFrame object.
-     * 
+     *
      * @return true if a frame is successfully read;
      * @return false if no frame is received.
      */
