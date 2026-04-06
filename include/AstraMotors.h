@@ -46,6 +46,17 @@ class AstraMotors {
      */
     AstraMotors(int setMotorID = 0, bool SetInverted = false, int setGearBox = 1);
 
+    /**
+     * @brief Default constructor for a REV motor controller
+     *
+     * @param setMotorID REV motor ID for this motor
+     * @param setCtrlMode Either CTRL_SPEED or CTRL_DUTYCYCLE for controlling via RPM or percent speed
+     * @param SetInverted Whether or not to invert the motor's direction (used for right wheels)
+     * @param SetGearBox Gearbox ratio attached to motor; e.g. for 64:1, use 64
+     */
+    [[deprecated("Use AstraMotors constructor without ctrlMode parameter instead.")]]
+    AstraMotors(int setMotorID = 0, sparkMax_ctrlType setCtrlMode = sparkMax_ctrlType::kDutyCycle, bool SetInverted = false, int setGearBox = 1);
+
 
     //---------------------------------------------//
     //  Getters

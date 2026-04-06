@@ -27,6 +27,10 @@ AstraMotors::AstraMotors(int setMotorID, bool SetInverted, int setGearBox) {
     rotatingToPos = false;
 }
 
+AstraMotors::AstraMotors(int setMotorID, sparkMax_ctrlType setCtrlMode, bool SetInverted, int setGearBox) {
+    AstraMotors(setMotorID, SetInverted, setGearBox);
+}
+
 
 void AstraMotors::setDuty(float val) {  // controller input value
     controlMode = sparkMax_ctrlType::kDutyCycle;
