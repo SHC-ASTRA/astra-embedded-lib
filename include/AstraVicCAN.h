@@ -505,7 +505,7 @@ class VicCanController {
     /**
      * @brief Relay CAN frame to Serial interface, either from CAN network or respond()/send()
      *
-     * Serial layout: "can_relay_fromvic, [mcu], [cmdId], data[0-8]..."
+     * Serial layout: "can_relay_fromvic, [mcu], [cmdId], data[0-4]..."
      *
      * @param vicFrame The VicCanFrame to be relayed
      */
@@ -530,12 +530,12 @@ class VicCanController {
     /**
      * @brief Relay a CAN frame from Serial interface to CAN network, or queue to act on it.
      *
-     * Serial layout: "can_relay_tovic, [mcu], [cmdId], data[0-8]..."
+     * Serial layout: "can_relay_tovic, [mcu], [cmdId], data[0-4]..."
      *
      * @param args std::vector<String> containing the Serial input
      */
     void relayFromSerial(const std::vector<String>& args) {
-        if (args.size() < 3 || args.size() > 11) {
+        if (args.size() < 3 || args.size() > 7) {
             Serial.println("Error: Invalid command");
             return;
         }
