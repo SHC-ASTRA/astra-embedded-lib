@@ -1,5 +1,5 @@
 /**
- * @file Template.cpp
+ * @file Template_ArduinoIDE.cpp
  * @author your name (you@domain.com)
  * @brief description
  *
@@ -9,9 +9,8 @@
 //  Includes  //
 //------------//
 
-#include "AstraMisc.h"
-#include "project/TEMPLATE.h"
-
+#include <Arduino.h>  // Not required in Arduino IDE, but needed for PlatformIO projects
+#include <vector>
 
 //------------//
 //  Settings  //
@@ -19,6 +18,8 @@
 
 // Comment out to disable LED blinking
 #define BLINK
+
+#define SERIAL_BAUD 115200
 
 
 //---------------------//
@@ -37,6 +38,8 @@ bool ledState = false;
 //--------------//
 //  Prototypes  //
 //--------------//
+
+void parseInput(const String input, std::vector<String>& args);
 
 
 //------------------------------------------------------------------------------------------------//
@@ -192,3 +195,31 @@ void loop() {
 //    //            //          //      //////////    //
 //                                                    //
 //----------------------------------------------------//
+
+// Pulled from astra-embedded-lib
+void parseInput(const String input, std::vector<String>& args) {
+#define CMD_DELIM ','
+
+    int lastIndex = -1;
+    int index = -1;
+
+    // Prevent MCU crash from attempting to access args[0]
+    if (input.length() == 0) {
+        args.push_back("ERR_NOINPUT");
+        return;
+    }
+
+    unsigned count = 0;
+    while (count++, count < 200) {
+        lastIndex = index;
+        index = input.indexOf(CMD_DELIM, lastIndex + 1);
+        if (index == -1) {
+            args.push_back(input.substring(lastIndex + 1));
+            break;
+        } else {
+            args.push_back(input.substring(lastIndex + 1, index));
+        }
+    }
+
+    // output is via vector<String>& args
+}
