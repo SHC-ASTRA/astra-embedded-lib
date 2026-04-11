@@ -16,7 +16,7 @@ class AstraMotors {
     sparkMax_ctrlType controlMode;
     bool inverted;  // Inverts the speed of the motor, this should be true for right wheels
 
-    int currentMotorSpeed;  // Current speed of the motor
+    float currentMotorSpeed;  // Current speed of the motor
     int maxSpeed;
 
     float currentDutyCycle;
@@ -138,7 +138,7 @@ class AstraMotors {
     }
     // Send the currently tracked speed (velocity; currentMotorSpeed) to the motor
     inline void sendSpeed() {
-        CAN_sendControl(motorID, sparkMax_ctrlType::kVelocity, currentMotorSpeed);
+        CAN_sendControl(motorID, sparkMax_ctrlType::kVelocity, static_cast<float>(currentMotorSpeed) / 14.0);
     }
     
     void sendDuty(float val);   // Send this duty cycle to the motor (bypasses acceleration)
