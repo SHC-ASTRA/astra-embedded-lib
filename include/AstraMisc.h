@@ -25,6 +25,95 @@
 typedef unsigned long ASTRA_TIME_T;
 
 
+//------------------------------------------------------------------------------------------------//
+// MCU Versioning
+
+// The below code generates a 32-bit timestamp (seconds since epoch).
+// It has been sent through hell to be strictly compile-time in a pre-C++14 world.
+// I hate it, but it does work.
+
+const int EPOCH_YEAR = 2022;
+const int EPOCH_MONTH = 1;  // Month does not work correctly if changed
+const int EPOCH_DATE = 1;
+
+constexpr int isleap(int year) {
+    return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+}
+// From https://www.geeksforgeeks.org/dsa/count-of-leap-years-in-a-given-year-range/
+constexpr int leap_years(int year) { 
+    return (year / 4 - (EPOCH_YEAR - 1) / 4) - (year / 100 - (EPOCH_YEAR - 1) / 100)
+        + (year / 400 - (EPOCH_YEAR - 1) / 400);
+}
+
+constexpr int YEAR = (__DATE__[7] - '0') * 1000 + (__DATE__[8] - '0') * 100 + (__DATE__[9] - '0') * 10
+    + (__DATE__[10] - '0');
+// There is genuinely no better way to do this... https://stackoverflow.com/a/19760369
+constexpr int MONTH = (
+    __DATE__ [2] == 'n' ? (__DATE__ [1] == 'a' ? 1 : 6)
+    : __DATE__ [2] == 'b' ? 2
+    : __DATE__ [2] == 'r' ? (__DATE__ [0] == 'M' ? 3 : 4)
+    : __DATE__ [2] == 'y' ? 5
+    : __DATE__ [2] == 'l' ? 7
+    : __DATE__ [2] == 'g' ? 8
+    : __DATE__ [2] == 'p' ? 9
+    : __DATE__ [2] == 't' ? 10
+    : __DATE__ [2] == 'v' ? 11
+    : 12);
+constexpr int DATE = (__DATE__[4] == ' ' ? 0 : __DATE__[4] - '0') * 10 + (__DATE__[5] - '0');
+constexpr int HOUR = (__TIME__[0] - '0') * 10 + (__TIME__[1] - '0');
+constexpr int MINUTE = (__TIME__[3] - '0') * 10 + (__TIME__[4] - '0');
+constexpr int SECOND = (__TIME__[6] - '0') * 10 + (__TIME__[7] - '0');
+
+// This is the actual worst... but pre-C++14 restricts constexpr functions to a single return statement.
+// Inspired by https://stackoverflow.com/a/73846054
+constexpr int DAYS_IN_YEAR_TILL_MONTH = (MONTH > 1 ? 31 : 0)
+    + (MONTH > 2 ? 28 : 0)
+    + (MONTH > 3 ? 31 : 0)
+    + (MONTH > 4 ? 30 : 0)
+    + (MONTH > 5 ? 31 : 0)
+    + (MONTH > 6 ? 30 : 0)
+    + (MONTH > 7 ? 31 : 0)
+    + (MONTH > 8 ? 31 : 0)
+    + (MONTH > 9 ? 30 : 0)
+    + (MONTH > 10 ? 31 : 0)
+    + (MONTH > 11 ? 30 : 0)
+    + (isleap(YEAR) && MONTH > 2 ? 1 : 0);
+
+constexpr int DAYS_TOTAL = (YEAR - EPOCH_YEAR) * 365 + leap_years(YEAR) + DAYS_IN_YEAR_TILL_MONTH
+    + (DATE - EPOCH_DATE);
+
+constexpr int32_t BUILD_TIMESTAMP = DAYS_TOTAL * 24 * 3600 + (HOUR - 1) * 3600 + MINUTE * 60 + SECOND;
+
+
+// dateCode is DDMMY
+static constexpr int16_t BUILD_DATE_CODE = (__DATE__[4] == ' ' ? 0 : __DATE__[4] - '0') * 1e4 +
+    (__DATE__[5] - '0') * 1e3 + MONTH * 1e1 + (__DATE__[10] - '0');
+// timeCode is HHMMS
+static constexpr int16_t BUILD_TIME_CODE = (__TIME__[0] - '0') * 1e4 + (__TIME__[1] - '0') * 1e3
+    + (__TIME__[3] - '0') * 1e2 + (__TIME__[4] - '0') * 1e1 + (__TIME__[6] - '0');
+
+    #ifdef PROJECT_VERSION_MAJOR
+// libCode is MajorMinorPatchDirty
+static constexpr int16_t LIB_VER_CODE = ASTRA_LIB_VERSION_MAJOR * 1e3 + ASTRA_LIB_VERSION_MINOR * 1e2
+    + ASTRA_LIB_VERSION_PATCH * 1e1 + ASTRA_LIB_VERSION_ISDIRTY;
+// projCode is MajorMinorPatchDirty
+static constexpr int16_t PROJ_VER_CODE = PROJECT_VERSION_MAJOR * 1e3 + PROJECT_VERSION_MINOR * 1e2
+    + PROJECT_VERSION_PATCH * 1e1 + PROJECT_VERSION_ISDIRTY;
+#else
+#   error "If you are seeing this in the code, just build the project. If you are seeing this at compile time, ask David..."
+#endif
+
+
+// Seeing as how I am retarded and made VicCAN solely a header file, I can only use it in main.cpp.
+// So, macro it is.
+#define SEND_VERSION_INFO \
+    vicCAN.send(46, PROJECT_VERSION_COMMIT_HASH, ASTRA_LIB_VERSION_COMMIT_HASH); \
+    vicCAN.send(47, BUILD_TIMESTAMP, (LIB_VER_CODE << 4) | PROJ_VER_CODE);
+
+
+//------------------------------------------------------------------------------------------------//
+// Common helper functions
+
 // Standard struct to consolidate timer variables
 // Example Usage:
 //
@@ -80,8 +169,11 @@ void parseInput(const String input, std::vector<String>& args);
 float convertADC(uint16_t reading, const float r1, const float r2);
 
 
+//------------------------------------------------------------------------------------------------//
+// Stopwatch
+
 // Whether or not to print on every stopwatch action
-#define STOPWATCH_PRINT
+// #define STOPWATCH_PRINT
 // Serial(*) to use for stopwatch printouts
 #define STOPWATCH_SERIAL Serial
 

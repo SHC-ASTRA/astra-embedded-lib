@@ -3,8 +3,11 @@
 
 Import("env")
 Import("projenv")
+global_env = DefaultEnvironment()
 
 import subprocess
+import os
+import sys
 from warnings import warn
 
 
@@ -36,16 +39,29 @@ def detect_versioning():
         version_minor = int(version_parts[1]) if len(version_parts) > 1 else 0
         version_patch = int(version_parts[2]) if len(version_parts) > 2 else 0
 
-    # Set ismain to true if on main and not dirty
-    git_branch = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True)
+    # Set isdirty to 1 if there are uncommitted changes
     git_status = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
-    is_main = 0
-    if git_branch.returncode == 0 and git_status.returncode == 0:
-        branch_name = git_branch.stdout.strip()
-        if branch_name == "main" and git_status.stdout.strip() == "":
-            is_main = 1
+    if git_status.returncode == 0 and git_status.stdout.strip() != "":
+        is_dirty = 1
+    else:
+        is_dirty = 0
 
-    return (version_major, version_minor, version_patch, is_main)
+    # Get current short commit hash
+    git_hash = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True)
+    if git_hash.returncode != 0:
+        warn("Warning: Could not determine git commit hash.")
+        commit_hash = 0
+    else:
+        commit_hash = git_hash.stdout.strip()
+        warn(f"Current Git commit hash: {commit_hash}")
+        commit_hash = int(commit_hash, 16)  # convert hex string to integer
+
+    return (version_major, version_minor, version_patch, is_dirty, commit_hash)
+
+
+def append_version_defines(defines):
+    env.Append(CPPDEFINES=defines)
+    projenv.Append(CPPDEFINES=defines)
 
 
 def setup_lib_versioning(target=None, source=None, env=None):
@@ -53,20 +69,22 @@ def setup_lib_versioning(target=None, source=None, env=None):
     repo_name = get_repo_name()
 
     if repo_name and repo_name.endswith("-Embedded-Lib"):
-        version_major, version_minor, version_patch, is_main = detect_versioning()
+        version_major, version_minor, version_patch, is_dirty, commit_hash = detect_versioning()
     else:
         warn("Repository name mismatch. crying.")
         version_major = 0
         version_minor = 0
         version_patch = 0
-        is_main = 0
+        is_dirty = 0
+        commit_hash = 0
 
-    warn(f"Got version for astra-embedded-lib: {version_major}.{version_minor}.{version_patch}, is_main={is_main}")
-    projenv.Append(CPPDEFINES=[
+    warn(f"Got version for astra-embedded-lib: {version_major}.{version_minor}.{version_patch}, is_dirty={is_dirty}, hash={commit_hash}")
+    append_version_defines([
         ("ASTRA_LIB_VERSION_MAJOR", version_major),
         ("ASTRA_LIB_VERSION_MINOR", version_minor),
         ("ASTRA_LIB_VERSION_PATCH", version_patch),
-        ("ASTRA_LIB_VERSION_ISMAIN", is_main)
+        ("ASTRA_LIB_VERSION_ISDIRTY", is_dirty),
+        ("ASTRA_LIB_VERSION_COMMIT_HASH", commit_hash)
     ])
 
 def setup_project_versioning(target=None, source=None, env=None):
@@ -74,22 +92,33 @@ def setup_project_versioning(target=None, source=None, env=None):
     repo_name = get_repo_name()
 
     if repo_name and "-embedded" in repo_name:
-        version_major, version_minor, version_patch, is_main = detect_versioning()
+        version_major, version_minor, version_patch, is_dirty, commit_hash = detect_versioning()
     else:
         warn("Repository name mismatch. crying.")
         version_major = 0
         version_minor = 0
         version_patch = 0
-        is_main = 0
+        is_dirty = 0
+        commit_hash = 0
 
-    warn(f"Got version for project: {version_major}.{version_minor}.{version_patch}, is_main={is_main}")
-    projenv.Append(CPPDEFINES=[
+    warn(f"Got version for project: {version_major}.{version_minor}.{version_patch}, is_dirty={is_dirty}, hash={commit_hash}")
+    append_version_defines([
         ("PROJECT_VERSION_MAJOR", version_major),
         ("PROJECT_VERSION_MINOR", version_minor),
         ("PROJECT_VERSION_PATCH", version_patch),
-        ("PROJECT_VERSION_ISMAIN", is_main)
+        ("PROJECT_VERSION_ISDIRTY", is_dirty),
+        ("PROJECT_VERSION_COMMIT_HASH", commit_hash)
     ])
 
 
-DefaultEnvironment().AddPreAction("$BUILD_DIR/src/main.cpp.o", setup_project_versioning)  # Called as a part of *-embedded project build process
-setup_lib_versioning()  # Called as a part of *-embedded-Lib build process
+# global_env.AddPreAction("$BUILD_DIR/src/main.cpp.o", setup_project_versioning)  # Called as a part of *-embedded project build process
+
+def main():
+    setup_lib_versioning()  # Called as a part of *-embedded-Lib build process
+    old_wd = os.getcwd()
+    warn(f"Starting working directory: {old_wd}")
+    os.chdir(global_env.subst("$BUILD_DIR"))
+    setup_project_versioning()
+    os.chdir(old_wd)
+
+main()
