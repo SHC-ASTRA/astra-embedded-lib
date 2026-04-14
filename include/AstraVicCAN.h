@@ -13,6 +13,9 @@
 
 #include "AstraCAN.h"  // For CAN library and printCANframe()
 #include <vector>  // For std::vector<String> args from relayFromSerial()
+#include "unilib/can_defs.hpp"
+
+using namespace unilib;
 
 
 // How many decimal places to include in data from rover
@@ -30,107 +33,49 @@
 #   warning "VICAN_DEBUG is enabled. good luck soldier."
 #endif
 
-// Microcontroller VicCAN ID's based on submodule; use these instead of the raw numbers
-enum class McuId : uint8_t {
-    MCU_BROADCAST = 1,
-    MCU_CORE,
-    MCU_ARM,
-    MCU_DIGIT,
-    MCU_FAERIE,
-    MCU_CITADEL
-};
 
 // Shorthand for the VicCAN ID used by the active MCU
 #if defined(CORE)
-#    define SUBMODULE_CAN_ID McuId::MCU_CORE
+#    define SUBMODULE_CAN_ID CanMcuId::MCU_CORE
 #elif defined(ARM)
-#    define SUBMODULE_CAN_ID McuId::MCU_ARM
+#    define SUBMODULE_CAN_ID CanMcuId::MCU_ARM
 #elif defined(DIGIT)
-#    define SUBMODULE_CAN_ID McuId::MCU_DIGIT
+#    define SUBMODULE_CAN_ID CanMcuId::MCU_DIGIT
 #elif defined(FAERIE)
-#    define SUBMODULE_CAN_ID McuId::MCU_FAERIE
+#    define SUBMODULE_CAN_ID CanMcuId::MCU_FAERIE
 #elif defined(CITADEL)
-#    define SUBMODULE_CAN_ID McuId::MCU_CITADEL
+#    define SUBMODULE_CAN_ID CanMcuId::MCU_CITADEL
 #else  // Default - no macro in platformio.ini; will only respond to broadcast messages
-#    define SUBMODULE_CAN_ID McuId::MCU_BROADCAST
+#    define SUBMODULE_CAN_ID CanMcuId::MCU_BROADCAST
 #    warning "No submodule defined in platformio.ini; will only respond to broadcast messages"
 #endif
-
-// Possible datatypes for a VicCAN frame; decides how to decode/encode data
-enum class CanDataType : uint8_t {
-    DT_1f64 = 0,
-    DT_2f32,
-    DT_4i16,
-    DT_NONE
-};
-
-// Command IDs for VicCAN frames
-enum CanCmdId : uint8_t {
-    // General misc
-    CMD_PING = 1,
-    CMD_TIME,
-    CMD_B_LED,
-    CMD_SENSOR_RECON,
-    // REV Motor control
-    CMD_REV_STOP = 16,
-    CMD_REV_IDENTIFY,
-    CMD_REV_IDLE_MODE,
-    CMD_REV_SET_DUTY,
-    // Misc physical control
-    CMD_LSS_TURNBY_DEG = 24,
-    CMD_PWMSERVO_SET_DEG,
-    CMD_DCMOTOR_CTRL,
-    CMD_STEPPER_CTRL,
-    CMD_LASER_CTRL,
-    CMD_LSS_RESET,
-    // Submodule-specific
-    CMD_ARM_IK_CTRL = 32,
-    CMD_ARM_IK_TTG,
-    CMD_DIGIT_LINAC_CTRL,
-    CMD_DIGIT_WRIST_ROLL,
-    CMD_DIGIT_IK_CTRL,
-    CMD_FAERIE_SKAKE,
-    CMD_FAERIE_UVLED,
-    CMD_ARM_MANUAL,
-    CMD_CITADEL_FAN_CTRL,
-    // Data request
-    CMD_GNSS_LAT = 48,
-    CMD_GNSS_LON,
-    CMD_GNSS_SAT,
-    CMD_DATA_IMU_GYRO,
-    CMD_DATA_IMU_ACCEL_HEADING,
-    CMD_REVMOTOR_FEEDBACK,
-    CMD_POWER_VOLTAGE,
-    CMD_ARM_ENCODER_ANGLES,
-    CMD_DATA_BMP
-};
 
 /**
  * @brief Takes a MCU name in string form (i.e., "core"), and turns it into a MCU ID enum, if valid
  * 
  * @param str String containing only the MCU name, all lower case
- * @param mcuID McuId enum output corresponding to MCU name, if valid
+ * @param mcuID CanMcuId enum output corresponding to MCU name, if valid
  * @return true on valid MCU name;
  * @return false otherwise
  */
-bool mcuIdFromString(String str, McuId* mcuID) {
+bool mcuIdFromString(String str, CanMcuId* mcuID) {
     if (str.length() == 0)
         return false;
 
     str.toLowerCase();  // Make it case-insensitive
     
     if (str == "broadcast")
-        *mcuID = McuId::MCU_BROADCAST;
+        *mcuID = CanMcuId::MCU_BROADCAST;
     else if (str == "core")
-        *mcuID = McuId::MCU_CORE;
+        *mcuID = CanMcuId::MCU_CORE;
     else if (str == "arm")
-        *mcuID = McuId::MCU_ARM;
+        *mcuID = CanMcuId::MCU_ARM;
     else if (str == "digit")
-        *mcuID = McuId::MCU_DIGIT;
+        *mcuID = CanMcuId::MCU_DIGIT;
     else if (str == "faerie")
-        *mcuID = McuId::MCU_FAERIE;
+        *mcuID = CanMcuId::MCU_FAERIE;
     else if (str == "citadel")
-        *mcuID = McuId::MCU_CITADEL;
+        *mcuID = CanMcuId::MCU_CITADEL;
     else
         return false;
     
@@ -143,18 +88,18 @@ bool mcuIdFromString(String str, McuId* mcuID) {
  * @param mcuID MCU ID enum
  * @return String containing only the name of the MCU
  */
-String mcuIdToString(const McuId mcuID) {
-    if (mcuID == McuId::MCU_BROADCAST)
+String mcuIdToString(const CanMcuId mcuID) {
+    if (mcuID == CanMcuId::MCU_BROADCAST)
         return "broadcast";
-    else if (mcuID == McuId::MCU_CORE)
+    else if (mcuID == CanMcuId::MCU_CORE)
         return "core";
-    else if (mcuID == McuId::MCU_ARM)
+    else if (mcuID == CanMcuId::MCU_ARM)
         return "arm";
-    else if (mcuID == McuId::MCU_DIGIT)
+    else if (mcuID == CanMcuId::MCU_DIGIT)
         return "digit";
-    else if (mcuID == McuId::MCU_FAERIE)
+    else if (mcuID == CanMcuId::MCU_FAERIE)
         return "faerie";
-    else if (mcuID == McuId::MCU_CITADEL)
+    else if (mcuID == CanMcuId::MCU_CITADEL)
         return "citadel";
     else  // Should never run unless an MCU is added and not included in this function
         return "error_mcu";
@@ -172,7 +117,7 @@ String mcuIdToString(const McuId mcuID) {
 class VicCanFrame {
    public:
     // Within CAN ID
-    McuId mcuId;           // 3 bits
+    CanMcuId mcuId;           // 3 bits
     CanDataType dataType;  // 2 bits
     uint8_t cmdId;         // 6 bits
     // Built-in to CAN frame
@@ -191,7 +136,7 @@ class VicCanFrame {
      * 
      */
     void clear() {
-        mcuId = McuId::MCU_BROADCAST;
+        mcuId = CanMcuId::MCU_BROADCAST;
         dataType = CanDataType::DT_NONE;
         cmdId = 0;
         rtr = false;
@@ -300,7 +245,7 @@ class VicCanFrame {
      * @return false if the frame is intended for a different mcu only.
      */
     inline bool isForMe() {
-        return mcuId == SUBMODULE_CAN_ID || mcuId == McuId::MCU_BROADCAST;
+        return mcuId == SUBMODULE_CAN_ID || mcuId == CanMcuId::MCU_BROADCAST;
     }
 
 
@@ -310,7 +255,7 @@ class VicCanFrame {
      * @param id The 11-bit CAN ID to parse
      */
     void parseCanId(uint32_t id) {
-        mcuId = static_cast<McuId>((id >> 8) & 0x7);
+        mcuId = static_cast<CanMcuId>((id >> 8) & 0x7);
         dataType = static_cast<CanDataType>((id >> 6) & 0x3);
         cmdId = id & 0x3F;
     }
@@ -585,7 +530,7 @@ class VicCanController {
         }
 
         // If this CAN frame is for this MCU, queue it to act on it
-        if (outVicFrame.mcuId == SUBMODULE_CAN_ID || outVicFrame.mcuId == McuId::MCU_BROADCAST) {
+        if (outVicFrame.mcuId == SUBMODULE_CAN_ID || outVicFrame.mcuId == CanMcuId::MCU_BROADCAST) {
             relayFrameWaiting = true;
             inVicCanFrame = outVicFrame;
 #ifdef VICCAN_DEBUG
