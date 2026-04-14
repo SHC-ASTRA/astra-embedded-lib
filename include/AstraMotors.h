@@ -138,7 +138,14 @@ class AstraMotors {
     }
     // Send the currently tracked speed (velocity; currentMotorSpeed) to the motor
     inline void sendSpeed() {
-        CAN_sendControl(motorID, sparkMax_ctrlType::kVelocity, static_cast<float>(currentMotorSpeed) / 14.0);
+        // REV Sparkmaxes do not treat a velocity setpoint as an actual velocity without
+        //  specific configuration, and instead treat it as a RPM/Volt value.
+        // E.g., a setpoint of 200 will produce a motor velocity of around 2700 RPM.
+        // While this is tested and working on both Clucky and Testbed and until I write
+        //  something more robust to use the last read voltage measurement from the Sparkmax,
+        //  14 V is a decent approximation of the voltage.
+        static constexpr float V_BATT = 14.0;
+        CAN_sendControl(motorID, sparkMax_ctrlType::kVelocity, static_cast<float>(currentMotorSpeed) / V_BATT);
     }
     
     void sendDuty(float val);   // Send this duty cycle to the motor (bypasses acceleration)

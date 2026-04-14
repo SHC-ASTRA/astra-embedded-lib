@@ -174,6 +174,11 @@ void AstraMotors::parseStatus2(uint8_t frameIn[]) {
     status2.timestamp = millis();
 }
 
+// I made this guy to help drive the rover a specific distance, but with ros2_control and Nav2,
+// it will be better anyways to use inertial and visual odometry to control distance driven
+// with discrete velocity control rather than using the motor's built-in encoder when
+// driving for hundreds of meters...
+[[deprecated("Use closed-loop control with external sensors instead.")]]
 void AstraMotors::turnByDeg(float deg) {
     rotatingToPos = true;
     targetPos = status2.sensorPosition + ((deg / 360.0) * gearBox);
@@ -190,7 +195,7 @@ void AstraMotors::turnByDeg(float deg) {
         else
             sendDuty(-1 * dutyCycle);
     } else if (controlMode == sparkMax_ctrlType::kVelocity) {
-        const float speed = 1000;  // Arbitrary for now
+        const float speed = 100;  // Arbitrary for now
         if (deg < 0)
             sendSpeed(speed);
         else
