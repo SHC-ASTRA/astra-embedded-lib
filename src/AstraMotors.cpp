@@ -24,7 +24,6 @@ AstraMotors::AstraMotors(int setMotorID, bool SetInverted, int setGearBox) {
     maxDuty = 1;
 
     gearBox = setGearBox;
-    rotatingToPos = false;
 }
 
 AstraMotors::AstraMotors(int setMotorID, sparkMax_ctrlType setCtrlMode, bool SetInverted, int setGearBox) {
@@ -69,21 +68,8 @@ void AstraMotors::accelerate() {
     if (targetDutyCycle == 0)
         currentDutyCycle = 0;
 
-    // rotToPos control
-    if (rotatingToPos) {
-        if (millis() - status2.timestamp > 100
-            || (direction() == 1 && status2.sensorPosition > targetPos - 1)
-            || (direction() == -1 && status2.sensorPosition < targetPos + 1))
-        {
-            stop();
-#   ifdef MOTOR_DEBUG
-            Serial.println("Stopping rotation.");
-#   endif
-        }
-        return;
-    }
     // Regular (linear) acceleration
-    else if (targetDutyCycle != currentDutyCycle) {
+    if (targetDutyCycle != currentDutyCycle) {
         const float threshold = 0.1;
         const float current = currentDutyCycle;
         const float target = targetDutyCycle;
@@ -178,29 +164,10 @@ void AstraMotors::parseStatus2(uint8_t frameIn[]) {
 // it will be better anyways to use inertial and visual odometry to control distance driven
 // with discrete velocity control rather than using the motor's built-in encoder when
 // driving for hundreds of meters...
-[[deprecated("Use closed-loop control with external sensors instead.")]]
+[[deprecated("Functionality removed; use closed-loop control with external sensors instead.")]]
 void AstraMotors::turnByDeg(float deg) {
-    rotatingToPos = true;
-    targetPos = status2.sensorPosition + ((deg / 360.0) * gearBox);
-
-#ifdef MOTOR_DEBUG
-    Serial.print("Turning to pos: ");
-    Serial.println(targetPos);
-#endif
-
-    if (controlMode == sparkMax_ctrlType::kDutyCycle) {
-        const float dutyCycle = 0.5;  // Arbitrary for now
-        if (deg < 0)
-            sendDuty(dutyCycle);
-        else
-            sendDuty(-1 * dutyCycle);
-    } else if (controlMode == sparkMax_ctrlType::kVelocity) {
-        const float speed = 100;  // Arbitrary for now
-        if (deg < 0)
-            sendSpeed(speed);
-        else
-            sendSpeed(-1 * speed);
-    }
+    // I don't want to deal with this unused code anymore
+    return;
 }
 
 #endif  // __has_include("FlexCAN_T4.h")

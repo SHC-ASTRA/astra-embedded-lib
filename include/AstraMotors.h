@@ -26,9 +26,6 @@ class AstraMotors {
 
     int gearBox;
 
-    bool rotatingToPos;
-    float targetPos;
-
 
    public:
 
@@ -101,8 +98,9 @@ class AstraMotors {
 
     // Whether or not the motor is currently turning to a position using the internal encoder feedback
     // (from turnByDeg() or turnToDeg())
+    [[deprecated("Functionality removed, do not use.")]]
     inline bool isRotToPos() {
-        return rotatingToPos;
+        return false;
     }
 
 
@@ -160,11 +158,9 @@ class AstraMotors {
     void accelerate();          // Run UpdateForAcceleration() and sendDuty()
 
     void turnByDeg(float deg);  // Turn the motor by deg degrees
-    void turnToDeg(float deg);  // Turn the motor to deg degrees
-    
+
     // Stop motor; does not activate brake mode
     inline void stop() {
-        rotatingToPos = false;
         sendDuty(0);
     }
 };
