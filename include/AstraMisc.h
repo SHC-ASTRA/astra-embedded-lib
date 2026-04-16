@@ -85,20 +85,9 @@ constexpr int DAYS_TOTAL = (YEAR - EPOCH_YEAR) * 365 + leap_years(YEAR) + DAYS_I
 constexpr int32_t BUILD_TIMESTAMP = DAYS_TOTAL * 24 * 3600 + (HOUR - 1) * 3600 + MINUTE * 60 + SECOND;
 
 
-// dateCode is DDMMY
-static constexpr int16_t BUILD_DATE_CODE = (__DATE__[4] == ' ' ? 0 : __DATE__[4] - '0') * 1e4 +
-    (__DATE__[5] - '0') * 1e3 + MONTH * 1e1 + (__DATE__[10] - '0');
-// timeCode is HHMMS
-static constexpr int16_t BUILD_TIME_CODE = (__TIME__[0] - '0') * 1e4 + (__TIME__[1] - '0') * 1e3
-    + (__TIME__[3] - '0') * 1e2 + (__TIME__[4] - '0') * 1e1 + (__TIME__[6] - '0');
-
-    #ifdef PROJECT_VERSION_MAJOR
-// libCode is MajorMinorPatchDirty
-static constexpr int16_t LIB_VER_CODE = ASTRA_LIB_VERSION_MAJOR * 1e3 + ASTRA_LIB_VERSION_MINOR * 1e2
-    + ASTRA_LIB_VERSION_PATCH * 1e1 + ASTRA_LIB_VERSION_ISDIRTY;
-// projCode is MajorMinorPatchDirty
-static constexpr int16_t PROJ_VER_CODE = PROJECT_VERSION_MAJOR * 1e3 + PROJECT_VERSION_MINOR * 1e2
-    + PROJECT_VERSION_PATCH * 1e1 + PROJECT_VERSION_ISDIRTY;
+#ifdef PROJECT_VERSION_ISMAIN
+static constexpr int16_t IS_MAINDIRTY_CODE = (PROJECT_VERSION_ISMAIN) | (PROJECT_VERSION_ISDIRTY << 1)
+                                            | (ASTRA_LIB_VERSION_ISMAIN << 2) | (ASTRA_LIB_VERSION_ISDIRTY << 3);
 #else
 #   error "If you are seeing this in the code, just build the project. If you are seeing this at compile time, ask David..."
 #endif
@@ -108,7 +97,7 @@ static constexpr int16_t PROJ_VER_CODE = PROJECT_VERSION_MAJOR * 1e3 + PROJECT_V
 // So, macro it is.
 #define SEND_VERSION_INFO \
     vicCAN.send(46, PROJECT_VERSION_COMMIT_HASH, ASTRA_LIB_VERSION_COMMIT_HASH); \
-    vicCAN.send(47, BUILD_TIMESTAMP, (LIB_VER_CODE << 4) | PROJ_VER_CODE);
+    vicCAN.send(47, BUILD_TIMESTAMP, IS_MAINDIRTY_CODE);
 
 
 //------------------------------------------------------------------------------------------------//
