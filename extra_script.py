@@ -3,6 +3,7 @@
 
 import subprocess
 import os
+from pathlib import Path
 from sys import stderr
 from warnings import warn
 from inspect import getframeinfo, stack
@@ -31,17 +32,17 @@ def main():
 
 
 def get_repo_name():
-    repo_name = subprocess.run(
+    repo_path = subprocess.run(
         ["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True
     )
-    if repo_name.returncode != 0:
+    if repo_path.returncode != 0:
         warn("Warning: Could not determine git repository path.")
         return None
     else:
-        repo_path = repo_name.stdout.strip()
-        repo_name_real = repo_path.split("/")[-1].split("\\")[-1]
-        debug_print(f"Current Git repository: {repo_name_real}")
-        return repo_name_real
+        repo_path = repo_path.stdout.strip()
+        repo_name = Path(repo_path).parts[-1]
+        debug_print(f"Current Git repository: {repo_name}")
+        return repo_name
 
 
 def detect_versioning():
@@ -62,9 +63,10 @@ def detect_versioning():
     if git_release.returncode == 0:
         version_str = git_release.stdout.strip()
         version_parts = version_str.lstrip("v").split(".")
-        version_major = int(version_parts[0]) if len(version_parts) > 0 else 0
-        version_minor = int(version_parts[1]) if len(version_parts) > 1 else 0
-        version_patch = int(version_parts[2]) if len(version_parts) > 2 else 0
+        version_parts += ["0"] * (3 - len(version_parts))
+        version_major = int(version_parts[0])
+        version_minor = int(version_parts[1])
+        version_patch = int(version_parts[2])
 
     # Set ismain to true if on main branch
     git_branch = subprocess.run(
@@ -82,10 +84,10 @@ def detect_versioning():
 
     # Get current short commit hash
     git_hash = subprocess.run(
-        ["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True
+        ["git", "rev-parse", "HEAD"], capture_output=True, text=True
     )
     if git_hash.returncode == 0:
-        commit_hash = git_hash.stdout.strip()
+        commit_hash = git_hash.stdout.strip()[-8:]
         debug_print(f"Current Git commit hash: {commit_hash}")
         commit_hash = int(commit_hash, 16)  # convert hex string to integer
     else:
