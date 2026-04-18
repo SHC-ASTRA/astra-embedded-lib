@@ -11,7 +11,6 @@
 
 #include <Arduino.h>
 
-#include "AstraCAN.h"  // For CAN library and printCANframe()
 #include <vector>  // For std::vector<String> args from relayFromSerial()
 #include "unilib/can_defs.hpp"
 
@@ -25,8 +24,9 @@ using namespace unilib;
 
 #if (defined(ESP32) && __has_include("ESP32-TWAI-CAN.hpp"))
 #   define CAN_AVAILABLE
+#   include "AstraCAN.h"  // For CAN library and printCANframe()
 #else
-#   warning "Could not find a compatible MCU CAN library. VicCAN will be limited to Serial use."
+#   warning "Could not find a compatible CAN library. VicCAN will be limited to Serial use only."
 #endif
 
 #ifdef VICAN_DEBUG
