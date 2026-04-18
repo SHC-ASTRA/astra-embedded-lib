@@ -26,8 +26,8 @@
 #   warning "Could not find a compatible MCU CAN library. VicCAN will be limited to Serial use."
 #endif
 
-#ifdef VICAN_DEBUG
-#   warning "VICAN_DEBUG is enabled. good luck soldier."
+#ifdef VICCAN_DEBUG
+#   warning "VICCAN_DEBUG is enabled. good luck soldier."
 #endif
 
 // Microcontroller VicCAN ID's based on submodule; use these instead of the raw numbers
