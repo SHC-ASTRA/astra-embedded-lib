@@ -7,15 +7,18 @@ global_env = DefaultEnvironment()
 
 import subprocess
 import os
-import sys
+from sys import stderr
 from warnings import warn
+from inspect import getframeinfo, stack
 
-DEBUG = False
+DEBUG = True
 
+def debug_print(msg: str):
+    caller = getframeinfo(stack()[1][0])  # https://stackoverflow.com/a/24439444
+    if DEBUG:
+        print(f"[extra_script.py:{caller.lineno}] DEBUG: {msg}", file=stderr)
 
 def get_repo_name():
-    if DEBUG:
-        warn("PLEASE IGNORE THESE WARNINGS! They are not actually warnings. This text just won't show up with print(). Ask David ._.")
     repo_name = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True)
     if repo_name.returncode != 0:
         warn("Warning: Could not determine git repository path.")
@@ -23,8 +26,7 @@ def get_repo_name():
     else:
         repo_path = repo_name.stdout.strip()
         repo_name_real = repo_path.split("/")[-1].split("\\")[-1]
-        if DEBUG:
-            warn(f"Current Git repository: {repo_name_real}")
+        debug_print(f"Current Git repository: {repo_name_real}")
         return repo_name_real
 
 def detect_versioning():
@@ -64,8 +66,7 @@ def detect_versioning():
         commit_hash = 0
     else:
         commit_hash = git_hash.stdout.strip()
-        if DEBUG:
-            warn(f"Current Git commit hash: {commit_hash}")
+        debug_print(f"Current Git commit hash: {commit_hash}")
         commit_hash = int(commit_hash, 16)  # convert hex string to integer
 
     return (version_major, version_minor, version_patch, is_main, is_dirty, commit_hash)
@@ -91,8 +92,7 @@ def setup_lib_versioning(target=None, source=None, env=None):
         is_dirty = 0
         commit_hash = 0
 
-    if DEBUG:
-        warn(f"Got version for astra-embedded-lib: {version_major}.{version_minor}.{version_patch}, is_main={is_main}, is_dirty={is_dirty}, hash={commit_hash}")
+    debug_print(f"Got version for astra-embedded-lib: {version_major}.{version_minor}.{version_patch}, is_main={is_main}, is_dirty={is_dirty}, hash={commit_hash}")
 
     append_version_defines([
         ("ASTRA_LIB_VERSION_MAJOR", version_major),
@@ -118,8 +118,7 @@ def setup_project_versioning(target=None, source=None, env=None):
         is_dirty = 0
         commit_hash = 0
 
-    if DEBUG:
-        warn(f"Got version for project: {version_major}.{version_minor}.{version_patch}, is_main={is_main}, is_dirty={is_dirty}, hash={commit_hash}")
+    debug_print(f"Got version for project: {version_major}.{version_minor}.{version_patch}, is_main={is_main}, is_dirty={is_dirty}, hash={commit_hash}")
 
     append_version_defines([
         ("PROJECT_VERSION_MAJOR", version_major),
@@ -131,9 +130,8 @@ def setup_project_versioning(target=None, source=None, env=None):
     ])
 
 
-# global_env.AddPreAction("$BUILD_DIR/src/main.cpp.o", setup_project_versioning)  # Called as a part of *-embedded project build process
-
 def main():
+    debug_print("DEBUGGING ENABLED: This is how you will see debug messages.")
     setup_lib_versioning()  # Called as a part of *-embedded-Lib build process
     old_wd = os.getcwd()
     os.chdir(global_env.subst("$BUILD_DIR"))
