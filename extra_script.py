@@ -8,7 +8,7 @@ from sys import stderr
 from warnings import warn
 from inspect import getframeinfo, stack
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Tuple, List
 
 if TYPE_CHECKING:
     env: Any
@@ -25,9 +25,11 @@ DEBUG = False
 def main():
     debug_print("DEBUGGING ENABLED: This is how you will see debug messages.")
     setup_lib_versioning()  # Called as a part of *-embedded-Lib build process
+
     old_wd = os.getcwd()
     os.chdir(global_env.subst("$BUILD_DIR"))
     setup_project_versioning()
+
     os.chdir(old_wd)
 
 
@@ -133,7 +135,7 @@ def setup_project_versioning():
     # First, check the repository name
     repo_name = get_repo_name()
 
-    if repo_name and "-embedded" in repo_name:
+    if repo_name and ("-embedded" in repo_name or repo_name.startswith("rover-")):
         version_major, version_minor, version_patch, is_main, is_dirty, commit_hash = (
             detect_versioning()
         )
@@ -168,7 +170,7 @@ def debug_print(msg: str):
         print(f"[extra_script.py:{caller.lineno}] DEBUG: {msg}", file=stderr)
 
 
-def append_version_defines(defines):
+def append_version_defines(defines: List[Tuple[str, Any]]):
     env.Append(CPPDEFINES=defines)
     projenv.Append(CPPDEFINES=defines)
 
