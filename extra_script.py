@@ -11,7 +11,7 @@ from sys import stderr
 from warnings import warn
 from inspect import getframeinfo, stack
 
-DEBUG = True
+DEBUG = False
 
 
 def main():
@@ -43,52 +43,51 @@ def detect_versioning():
         ["git", "describe", "--tags", "--abbrev=0"], capture_output=True, text=True
     )
 
-    # If no release tag is found, default to 0.0.0
-    if git_release.returncode != 0:
-        version_major = 0
-        version_minor = 0
-        version_patch = 0
-    else:
+    # Defaults/fallbacks
+    is_main = 0
+    is_dirty = 0
+    commit_hash = 0
+    version_major = 0
+    version_minor = 0
+    version_patch = 0
+
+    # Set release major/minor/patch
+    if git_release.returncode == 0:
         version_str = git_release.stdout.strip()
         version_parts = version_str.lstrip("v").split(".")
         version_major = int(version_parts[0]) if len(version_parts) > 0 else 0
         version_minor = int(version_parts[1]) if len(version_parts) > 1 else 0
         version_patch = int(version_parts[2]) if len(version_parts) > 2 else 0
 
-    # Set ismain to true if on main and not dirty
+    # Set ismain to true if on main branch
     git_branch = subprocess.run(
         ["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True
     )
-    if git_branch.returncode == 0 and git_branch.stdout.strip() == "main":
-        is_main = 1
-    else:
-        is_main = 0
+    if git_branch.returncode == 0:
+        is_main = int(git_branch.stdout.strip() == "main")
 
     # Set isdirty to 1 if there are uncommitted changes
     git_status = subprocess.run(
         ["git", "status", "--porcelain"], capture_output=True, text=True
     )
-    if git_status.returncode == 0 and git_status.stdout.strip() != "":
-        is_dirty = 1
-    else:
-        is_dirty = 0
+    if git_status.returncode == 0:
+        is_dirty = int(git_status.stdout.strip() != "")
 
     # Get current short commit hash
     git_hash = subprocess.run(
         ["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True
     )
-    if git_hash.returncode != 0:
-        warn("Warning: Could not determine git commit hash.")
-        commit_hash = 0
-    else:
+    if git_hash.returncode == 0:
         commit_hash = git_hash.stdout.strip()
         debug_print(f"Current Git commit hash: {commit_hash}")
         commit_hash = int(commit_hash, 16)  # convert hex string to integer
+    else:
+        warn("Warning: Could not determine git commit hash.")
 
     return (version_major, version_minor, version_patch, is_main, is_dirty, commit_hash)
 
 
-def setup_lib_versioning(target=None, source=None, env=None):
+def setup_lib_versioning():
     # First, check the repository name
     repo_name = get_repo_name()
 
@@ -121,7 +120,7 @@ def setup_lib_versioning(target=None, source=None, env=None):
     )
 
 
-def setup_project_versioning(target=None, source=None, env=None):
+def setup_project_versioning():
     # First, check the repository name
     repo_name = get_repo_name()
 
