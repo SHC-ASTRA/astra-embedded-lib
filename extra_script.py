@@ -14,10 +14,13 @@ from inspect import getframeinfo, stack
 DEBUG = True
 
 
-def debug_print(msg: str):
-    caller = getframeinfo(stack()[1][0])  # https://stackoverflow.com/a/24439444
-    if DEBUG:
-        print(f"[extra_script.py:{caller.lineno}] DEBUG: {msg}", file=stderr)
+def main():
+    debug_print("DEBUGGING ENABLED: This is how you will see debug messages.")
+    setup_lib_versioning()  # Called as a part of *-embedded-Lib build process
+    old_wd = os.getcwd()
+    os.chdir(global_env.subst("$BUILD_DIR"))
+    setup_project_versioning()
+    os.chdir(old_wd)
 
 
 def get_repo_name():
@@ -83,11 +86,6 @@ def detect_versioning():
         commit_hash = int(commit_hash, 16)  # convert hex string to integer
 
     return (version_major, version_minor, version_patch, is_main, is_dirty, commit_hash)
-
-
-def append_version_defines(defines):
-    env.Append(CPPDEFINES=defines)
-    projenv.Append(CPPDEFINES=defines)
 
 
 def setup_lib_versioning(target=None, source=None, env=None):
@@ -156,13 +154,15 @@ def setup_project_versioning(target=None, source=None, env=None):
     )
 
 
-def main():
-    debug_print("DEBUGGING ENABLED: This is how you will see debug messages.")
-    setup_lib_versioning()  # Called as a part of *-embedded-Lib build process
-    old_wd = os.getcwd()
-    os.chdir(global_env.subst("$BUILD_DIR"))
-    setup_project_versioning()
-    os.chdir(old_wd)
+def debug_print(msg: str):
+    caller = getframeinfo(stack()[1][0])  # https://stackoverflow.com/a/24439444
+    if DEBUG:
+        print(f"[extra_script.py:{caller.lineno}] DEBUG: {msg}", file=stderr)
+
+
+def append_version_defines(defines):
+    env.Append(CPPDEFINES=defines)
+    projenv.Append(CPPDEFINES=defines)
 
 
 main()
