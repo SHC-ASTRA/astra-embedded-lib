@@ -87,7 +87,7 @@ def detect_versioning():
         ["git", "rev-parse", "HEAD"], capture_output=True, text=True
     )
     if git_hash.returncode == 0:
-        commit_hash = git_hash.stdout.strip()[-8:]
+        commit_hash = git_hash.stdout.strip()[-7:]
         debug_print(f"Current Git commit hash: {commit_hash}")
         commit_hash = int(commit_hash, 16)  # convert hex string to integer
     else:
