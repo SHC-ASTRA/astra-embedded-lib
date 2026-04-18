@@ -1,15 +1,22 @@
 # Don't try to fix the Import statements. Don't try to add a shebang.
 # This file won't really work with a linter... because PlatformIO.
 
-Import("env")
-Import("projenv")
-global_env = DefaultEnvironment()
-
 import subprocess
 import os
 from sys import stderr
 from warnings import warn
 from inspect import getframeinfo, stack
+
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    env: Any
+    projenv: Any
+
+# SCons Imports
+Import("env")
+Import("projenv")
+global_env = DefaultEnvironment()
 
 DEBUG = False
 
