@@ -32,6 +32,10 @@ typedef unsigned long ASTRA_TIME_T;
 // It has been sent through hell to be strictly compile-time in a pre-C++14 world.
 // I hate it, but it does work.
 
+// TODO: move these to unilib
+const uint8_t CMD_VERSION_COMMIT = 7;
+const uint8_t CMD_VERSION_BUILD = 8;
+
 const int EPOCH_YEAR = 2022;
 const int EPOCH_MONTH = 1;  // Month does not work correctly if changed
 const int EPOCH_DATE = 1;
@@ -96,8 +100,8 @@ static constexpr int16_t IS_MAINDIRTY_CODE = (PROJECT_VERSION_ISMAIN) | (PROJECT
 // Seeing as how I am retarded and made VicCAN solely a header file, I can only use it in main.cpp.
 // So, macro it is.
 #define SEND_VERSION_INFO \
-    vicCAN.send(46, PROJECT_VERSION_COMMIT_HASH, ASTRA_LIB_VERSION_COMMIT_HASH); \
-    vicCAN.send(47, BUILD_TIMESTAMP, IS_MAINDIRTY_CODE);
+    vicCAN.send(CMD_VERSION_COMMIT, PROJECT_VERSION_COMMIT_HASH, ASTRA_LIB_VERSION_COMMIT_HASH); \
+    vicCAN.send(CMD_VERSION_BUILD, BUILD_TIMESTAMP, IS_MAINDIRTY_CODE);
 
 
 //------------------------------------------------------------------------------------------------//
