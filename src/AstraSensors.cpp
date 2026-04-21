@@ -207,7 +207,6 @@ float getBNOOrient(Adafruit_BNO055 &bno) {
     return event.orientation.x;  // Absolute Orientation/Heading
 }
 
-[[deprecated("This function is depreciated, use getPosition(SFE_UBLOX_GNSS &myGNSS, double (&gps_data)[4]) instead")]]
 void getPosition(SFE_UBLOX_GNSS &myGNSS, double (&gps_data)[3]) {
     gps_data[0] = myGNSS.getLatitude() / 10000000.0;
     gps_data[1] = myGNSS.getLongitude() / 10000000.0;
