@@ -8,7 +8,7 @@ from sys import stderr
 from warnings import warn
 from inspect import getframeinfo, stack
 
-from typing import TYPE_CHECKING, Any, Tuple, List
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     env: Any
@@ -170,7 +170,7 @@ def debug_print(msg: str):
         print(f"[extra_script.py:{caller.lineno}] DEBUG: {msg}", file=stderr)
 
 
-def append_version_defines(defines: List[Tuple[str, Any]]):
+def append_version_defines(defines: list[tuple[str, Any]]):
     env.Append(CPPDEFINES=defines)
     projenv.Append(CPPDEFINES=defines)
 
