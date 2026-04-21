@@ -16,9 +16,7 @@ class AstraMotors {
     sparkMax_ctrlType controlMode;
     bool inverted;  // Inverts the speed of the motor, this should be true for right wheels
 
-    int currentMotorSpeed;  // Current speed of the motor
-    int targetMotorSpeed;   // What the speed of the motor should be
-    float speedAccel;
+    float currentMotorSpeed;  // Current speed of the motor
     int maxSpeed;
 
     float currentDutyCycle;
@@ -27,9 +25,6 @@ class AstraMotors {
     float maxDuty;
 
     int gearBox;
-
-    bool rotatingToPos;
-    float targetPos;
 
 
    public:
@@ -43,10 +38,20 @@ class AstraMotors {
      * @brief Default constructor for a REV motor controller
      *
      * @param setMotorID REV motor ID for this motor
+     * @param SetInverted Whether or not to invert the motor's direction (used for right wheels)
+     * @param SetGearBox Gearbox ratio attached to motor; e.g. for 64:1, use 64
+     */
+    AstraMotors(int setMotorID = 0, bool SetInverted = false, int setGearBox = 1);
+
+    /**
+     * @brief Default constructor for a REV motor controller
+     *
+     * @param setMotorID REV motor ID for this motor
      * @param setCtrlMode Either CTRL_SPEED or CTRL_DUTYCYCLE for controlling via RPM or percent speed
      * @param SetInverted Whether or not to invert the motor's direction (used for right wheels)
      * @param SetGearBox Gearbox ratio attached to motor; e.g. for 64:1, use 64
      */
+    [[deprecated("Use AstraMotors constructor without ctrlMode parameter instead.")]]
     AstraMotors(int setMotorID = 0, sparkMax_ctrlType setCtrlMode = sparkMax_ctrlType::kDutyCycle, bool SetInverted = false, int setGearBox = 1);
 
 
@@ -93,8 +98,9 @@ class AstraMotors {
 
     // Whether or not the motor is currently turning to a position using the internal encoder feedback
     // (from turnByDeg() or turnToDeg())
+    [[deprecated("Functionality removed, do not use.")]]
     inline bool isRotToPos() {
-        return rotatingToPos;
+        return false;
     }
 
 
@@ -103,9 +109,6 @@ class AstraMotors {
     //---------------------------------------------//
 
     void setDuty(float val);  // Set the targetDutyCycle variable; will be enacted via accelerate()
-    void setSpeed(float val);  // Set the targetMotorSpeed variable; will be enacted via accelerate()
-
-    void UpdateForAcceleration();  // Update the current speed to try and match targetMotorSpeed
 
     void parseStatus(uint32_t apiId, uint8_t frameIn[]);  // Parse a status frame from 8-byte CAN data and REV API ID
     void parseStatus0(uint8_t frameIn[]);
@@ -133,7 +136,14 @@ class AstraMotors {
     }
     // Send the currently tracked speed (velocity; currentMotorSpeed) to the motor
     inline void sendSpeed() {
-        CAN_sendControl(motorID, sparkMax_ctrlType::kVelocity, currentMotorSpeed);
+        // REV Sparkmaxes do not treat a velocity setpoint as an actual velocity without
+        //  specific configuration, and instead treat it as a RPM/Volt value.
+        // E.g., a setpoint of 200 will produce a motor velocity of around 2700 RPM.
+        // While this is tested and working on both Clucky and Testbed and until I write
+        //  something more robust to use the last read voltage measurement from the Sparkmax,
+        //  14 V is a decent approximation of the voltage.
+        static constexpr float V_BATT = 14.0;
+        CAN_sendControl(motorID, sparkMax_ctrlType::kVelocity, static_cast<float>(currentMotorSpeed) / V_BATT);
     }
     
     void sendDuty(float val);   // Send this duty cycle to the motor (bypasses acceleration)
@@ -141,19 +151,16 @@ class AstraMotors {
 
     // No acceleration for current control
     inline void sendCurrent(float val) {
-        if (controlMode != sparkMax_ctrlType::kCurrent)
-            return;
+        controlMode = sparkMax_ctrlType::kCurrent;
         CAN_sendControl(motorID, sparkMax_ctrlType::kCurrent, val);
     }
 
     void accelerate();          // Run UpdateForAcceleration() and sendDuty()
 
     void turnByDeg(float deg);  // Turn the motor by deg degrees
-    void turnToDeg(float deg);  // Turn the motor to deg degrees
-    
+
     // Stop motor; does not activate brake mode
     inline void stop() {
-        rotatingToPos = false;
         sendDuty(0);
     }
 };

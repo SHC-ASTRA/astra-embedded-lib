@@ -10,15 +10,13 @@
 #    include "AstraMotors.h"
 
 
-AstraMotors::AstraMotors(int setMotorID, sparkMax_ctrlType setCtrlMode, bool SetInverted, int setGearBox) {
+AstraMotors::AstraMotors(int setMotorID, bool SetInverted, int setGearBox) {
     motorID = setMotorID;
-    controlMode = setCtrlMode;
+    controlMode = sparkMax_ctrlType::kDutyCycle;
     inverted = SetInverted;
 
     currentMotorSpeed = 0;
-    targetMotorSpeed = 0;
-    speedAccel = 5;
-    maxSpeed = 1000;
+    maxSpeed = 10000;
 
     currentDutyCycle = 0;
     targetDutyCycle = 0;
@@ -26,19 +24,15 @@ AstraMotors::AstraMotors(int setMotorID, sparkMax_ctrlType setCtrlMode, bool Set
     maxDuty = 1;
 
     gearBox = setGearBox;
-    rotatingToPos = false;
 }
 
-
-void AstraMotors::setSpeed(float val) {  // controller input value
-    if (abs(val) <= 0.02) {
-        targetMotorSpeed = 0;
-    } else {
-        targetMotorSpeed = val;
-    }
+AstraMotors::AstraMotors(int setMotorID, sparkMax_ctrlType setCtrlMode, bool SetInverted, int setGearBox) {
+    AstraMotors(setMotorID, SetInverted, setGearBox);
 }
+
 
 void AstraMotors::setDuty(float val) {  // controller input value
+    controlMode = sparkMax_ctrlType::kDutyCycle;
     if (abs(val) <= 0.02) {
         targetDutyCycle = 0;
     } else {
@@ -54,47 +48,28 @@ void AstraMotors::sendDuty(float val) {
 }
 
 void AstraMotors::sendSpeed(float val) {
-    setSpeed(val);
-    currentMotorSpeed = targetMotorSpeed;
-    sendSpeed();
+    controlMode = sparkMax_ctrlType::kVelocity;
+    if (abs(val) <= 0.02)
+        val = 0;
+    else if (val > maxSpeed)
+        val = maxSpeed;
+    else if (val < -maxSpeed)
+        val = -maxSpeed;
+
+    currentMotorSpeed = val;
+    sendSpeed();  // Send currentMotorSpeed to motors
 }
 
 void AstraMotors::accelerate() {
-    if (controlMode == sparkMax_ctrlType::kCurrent || controlMode == sparkMax_ctrlType::kVoltage)
-        return;  // No acceleration for current or voltage control
+    // Acceleration only applies to duty cycle
+    if (controlMode != sparkMax_ctrlType::kDutyCycle)
+        return;
 
-    UpdateForAcceleration();
-    if (controlMode == sparkMax_ctrlType::kDutyCycle)  // Duty cycle mode
-        sendDuty();
-    else if (controlMode == sparkMax_ctrlType::kVelocity || controlMode == sparkMax_ctrlType::kSmartVelocity)  // Speed mode
-        sendSpeed();
-}
-
-
-void AstraMotors::UpdateForAcceleration() {
-    if (controlMode == sparkMax_ctrlType::kDutyCycle && targetDutyCycle == 0) {
+    if (targetDutyCycle == 0)
         currentDutyCycle = 0;
-        return;
-    }
-    else if ((controlMode == sparkMax_ctrlType::kVelocity || controlMode == sparkMax_ctrlType::kSmartVelocity) && targetMotorSpeed == 0) {
-        currentMotorSpeed = 0;
-        return;
-    }
 
-    if (rotatingToPos) {
-        if (millis() - status2.timestamp > 100
-            || (direction() == 1 && status2.sensorPosition > targetPos - 1)
-            || (direction() == -1 && status2.sensorPosition < targetPos + 1))
-        {
-            stop();
-#   ifdef MOTOR_DEBUG
-            Serial.println("Stopping rotation.");
-#   endif
-        }
-        return;
-    }
-
-    if (controlMode == sparkMax_ctrlType::kDutyCycle) {
+    // Regular (linear) acceleration
+    if (targetDutyCycle != currentDutyCycle) {
         const float threshold = 0.1;
         const float current = currentDutyCycle;
         const float target = targetDutyCycle;
@@ -114,29 +89,9 @@ void AstraMotors::UpdateForAcceleration() {
             }
             currentDutyCycle = 0;
         }
-    } else if (controlMode == sparkMax_ctrlType::kSmartVelocity) {
-        currentMotorSpeed = targetMotorSpeed;
-    } else if (controlMode == sparkMax_ctrlType::kVelocity) {
-        const float threshold = 5;
-        const float current = currentMotorSpeed;
-        const float target = targetMotorSpeed;
+    }
 
-        if (abs(target - current) <= threshold) {  // if within threshold, just set it, don't gradually accelerate
-            currentMotorSpeed = targetMotorSpeed;
-        } else if (current < target - threshold) {  // increment if below set
-            currentMotorSpeed += speedAccel;
-        } else if (current > target + threshold) {  // decrement if above set
-            currentMotorSpeed -= speedAccel;
-        } else {
-            if ((current > 0 && target < 0) ||
-                (current < 0 && target > 0))  // if sticks in opposite direction, quick stop
-            {
-                currentMotorSpeed = 0;
-                targetMotorSpeed = 0;
-            }
-            currentMotorSpeed = 0;
-        }
-    }  // else do nothing
+    sendDuty();
 }
 
 
@@ -205,28 +160,14 @@ void AstraMotors::parseStatus2(uint8_t frameIn[]) {
     status2.timestamp = millis();
 }
 
+// I made this guy to help drive the rover a specific distance, but with ros2_control and Nav2,
+// it will be better anyways to use inertial and visual odometry to control distance driven
+// with discrete velocity control rather than using the motor's built-in encoder when
+// driving for hundreds of meters...
+[[deprecated("Functionality removed; use closed-loop control with external sensors instead.")]]
 void AstraMotors::turnByDeg(float deg) {
-    rotatingToPos = true;
-    targetPos = status2.sensorPosition + ((deg / 360.0) * gearBox);
-
-#ifdef MOTOR_DEBUG
-    Serial.print("Turning to pos: ");
-    Serial.println(targetPos);
-#endif
-
-    if (controlMode == sparkMax_ctrlType::kDutyCycle) {
-        const float dutyCycle = 0.5;  // Arbitrary for now
-        if (deg < 0)
-            sendDuty(dutyCycle);
-        else
-            sendDuty(-1 * dutyCycle);
-    } else if (controlMode == sparkMax_ctrlType::kVelocity) {
-        const float speed = 100;  // Arbitrary for now
-        if (deg < 0)
-            setSpeed(speed);
-        else
-            setSpeed(-1 * speed);
-    }
+    // I don't want to deal with this unused code anymore
+    return;
 }
 
 #endif  // __has_include("FlexCAN_T4.h")
