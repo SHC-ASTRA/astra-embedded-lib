@@ -25,6 +25,91 @@
 typedef unsigned long ASTRA_TIME_T;
 
 
+//------------------------------------------------------------------------------------------------//
+// MCU Versioning
+
+// The below code generates a 32-bit timestamp (seconds since epoch).
+// It has been sent through hell to be strictly compile-time in a pre-C++14 world.
+// I hate it, but it does work.
+
+// TODO: move these to unilib
+const uint8_t CMD_VERSION_COMMIT = 7;
+const uint8_t CMD_VERSION_BUILD = 8;
+
+const int EPOCH_YEAR = 2022;
+const int EPOCH_MONTH = 1;  // Month does not work correctly if changed
+const int EPOCH_DATE = 1;
+
+constexpr int isleap(int year) {
+    return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+}
+// From https://www.geeksforgeeks.org/dsa/count-of-leap-years-in-a-given-year-range/
+constexpr int leap_years(int year) { 
+    return (year / 4 - (EPOCH_YEAR - 1) / 4) - (year / 100 - (EPOCH_YEAR - 1) / 100)
+        + (year / 400 - (EPOCH_YEAR - 1) / 400);
+}
+
+constexpr int YEAR = (__DATE__[7] - '0') * 1000 + (__DATE__[8] - '0') * 100 + (__DATE__[9] - '0') * 10
+    + (__DATE__[10] - '0');
+// There is genuinely no better way to do this... https://stackoverflow.com/a/19760369
+constexpr int MONTH = (
+    __DATE__ [2] == 'n' ? (__DATE__ [1] == 'a' ? 1 : 6)
+    : __DATE__ [2] == 'b' ? 2
+    : __DATE__ [2] == 'r' ? (__DATE__ [0] == 'M' ? 3 : 4)
+    : __DATE__ [2] == 'y' ? 5
+    : __DATE__ [2] == 'l' ? 7
+    : __DATE__ [2] == 'g' ? 8
+    : __DATE__ [2] == 'p' ? 9
+    : __DATE__ [2] == 't' ? 10
+    : __DATE__ [2] == 'v' ? 11
+    : 12);
+constexpr int DATE = (__DATE__[4] == ' ' ? 0 : __DATE__[4] - '0') * 10 + (__DATE__[5] - '0');
+constexpr int HOUR = (__TIME__[0] - '0') * 10 + (__TIME__[1] - '0');
+constexpr int MINUTE = (__TIME__[3] - '0') * 10 + (__TIME__[4] - '0');
+constexpr int SECOND = (__TIME__[6] - '0') * 10 + (__TIME__[7] - '0');
+
+// This is the actual worst... but pre-C++14 restricts constexpr functions to a single return statement.
+// Inspired by https://stackoverflow.com/a/73846054
+constexpr int DAYS_IN_YEAR_TILL_MONTH = (MONTH > 1 ? 31 : 0)
+    + (MONTH > 2 ? 28 : 0)
+    + (MONTH > 3 ? 31 : 0)
+    + (MONTH > 4 ? 30 : 0)
+    + (MONTH > 5 ? 31 : 0)
+    + (MONTH > 6 ? 30 : 0)
+    + (MONTH > 7 ? 31 : 0)
+    + (MONTH > 8 ? 31 : 0)
+    + (MONTH > 9 ? 30 : 0)
+    + (MONTH > 10 ? 31 : 0)
+    + (MONTH > 11 ? 30 : 0)
+    + (isleap(YEAR) && MONTH > 2 ? 1 : 0);
+
+constexpr int DAYS_TOTAL = (YEAR - EPOCH_YEAR) * 365 + leap_years(YEAR) + DAYS_IN_YEAR_TILL_MONTH
+    + (DATE - EPOCH_DATE);
+
+constexpr int32_t BUILD_TIMESTAMP = DAYS_TOTAL * 24 * 3600 + (HOUR - 1) * 3600 + MINUTE * 60 + SECOND;
+
+
+#ifdef PROJECT_VERSION_ISMAIN
+static constexpr int16_t IS_MAINDIRTY_CODE = (PROJECT_VERSION_ISMAIN) | (PROJECT_VERSION_ISDIRTY << 1)
+                                            | (ASTRA_LIB_VERSION_ISMAIN << 2) | (ASTRA_LIB_VERSION_ISDIRTY << 3);
+#else
+#   error "If you are seeing this in the code, just build the project. If you are seeing this at compile time, ask David..."
+#endif
+
+
+// Seeing as how I am retarded and made VicCAN solely a header file, I can only use it in main.cpp.
+// So, macro it is.
+// All of the following macros except for the build timestamp are acquired from git at compile time
+// by extra_script.py for both astra-embedded-lib and the embedded project repo.
+#define SEND_VERSION_INFO                                                                                 \
+    vicCAN.send(CMD_VERSION_COMMIT, PROJECT_VERSION_COMMIT_HASH_LOWER, PROJECT_VERSION_COMMIT_HASH_UPPER, \
+        ASTRA_LIB_VERSION_COMMIT_HASH_LOWER, ASTRA_LIB_VERSION_COMMIT_HASH_UPPER);                        \
+    vicCAN.send(CMD_VERSION_BUILD, BUILD_TIMESTAMP, IS_MAINDIRTY_CODE);
+
+
+//------------------------------------------------------------------------------------------------//
+// Common helper functions
+
 // Standard struct to consolidate timer variables
 // Example Usage:
 //
@@ -45,16 +130,7 @@ struct Timer {
 
 // Clamps x between out_min and out_max using the expected input min and max
 // Used for controller input
-double map_d(double x, double in_min, double in_max, double out_min, double out_max) {
-    const double run = in_max - in_min;
-    if (run == 0)
-    {
-	    return 0;  // in_min == in_max, error
-    }
-    const double rise = out_max - out_min;
-    const double delta = x - in_min;
-    return (delta * rise) / run + out_min;
-}
+double map_d(double x, double in_min, double in_max, double out_min, double out_max);
 
 
 /**
@@ -76,90 +152,7 @@ inline bool checkArgs(const std::vector<String>& args, const size_t numArgs) {
  * @param args vector<String> to hold separated Strings
  * @author David Sharpe
  */
-void parseInput(const String input, std::vector<String>& args) {
-    // Modified from
-    // https://forum.arduino.cc/t/how-to-split-a-string-with-space-and-store-the-items-in-array/888813/9
-
-    // Index of previously found delim
-    int lastIndex = -1;
-    // Index of currently found delim
-    int index = -1;
-    // lastIndex=index, so lastIndex starts at -1, and with lastIndex+1, first search begins at 0
-
-    // if empty input for some reason, don't do anything
-    if (input.length() == 0) {
-        args.push_back("ERR_NOINPUT");  // Prevent MCU crash from attempting to access args[0]
-        return;
-    }
-
-    // Protection against infinite loop
-    unsigned count = 0;
-    while (count++, count < 200 /*arbitrary limit on number of delims because while(true) is scary*/) {
-        lastIndex = index;
-        // using lastIndex+1 instead of input = input.substring to reduce memory impact
-        index = input.indexOf(CMD_DELIM, lastIndex + 1);
-        if (index == -1) {  // No instance of delim found in input
-            // If no delims are found at all, then lastIndex+1 == 0, so whole string is passed.
-            // Otherwise, only the last part of input is passed because of lastIndex+1.
-            args.push_back(input.substring(lastIndex + 1));
-            // Exit the loop when there are no more delims
-            break;
-        } else {  // delim found
-            // If this is the first delim, lastIndex+1 == 0, so starts from beginning
-            // Otherwise, starts from last found delim with lastIndex+1
-            args.push_back(input.substring(lastIndex + 1, index));
-        }
-    }
-
-    // output is via vector<String>& args
-}
-
-/**
- * `input` into `args` separated by `delim`; equivalent to Python's `.split`;
- * Example:  "ctrl,led,on" => `{"ctrl","led","on"}`
- * @param input String to be separated
- * @param args vector<String> to hold separated Strings
- * @param delim char which separates parts of input
- * @author David Sharpe, for ASTRA
- * @deprecated Use function without delim parameter
- */
-[[deprecated("Use function without `delim` parameter")]]
-void parseInput(const String input, std::vector<String>& args, const char delim) {
-    // Modified from
-    // https://forum.arduino.cc/t/how-to-split-a-string-with-space-and-store-the-items-in-array/888813/9
-
-    // Index of previously found delim
-    int lastIndex = -1;
-    // Index of currently found delim
-    int index = -1;
-    // lastIndex=index, so lastIndex starts at -1, and with lastIndex+1, first search begins at 0
-
-    // if empty input for some reason, don't do anything
-    if (input.length() == 0)
-        return;
-
-    // Protection against infinite loop
-    unsigned count = 0;
-    while (count++,
-           count < 200 /*arbitrary limit on number of delims because while(true) is scary*/) {
-        lastIndex = index;
-        // using lastIndex+1 instead of input = input.substring to reduce memory impact
-        index = input.indexOf(CMD_DELIM, lastIndex + 1);
-        if (index == -1) {  // No instance of delim found in input
-            // If no delims are found at all, then lastIndex+1 == 0, so whole string is passed.
-            // Otherwise, only the last part of input is passed because of lastIndex+1.
-            args.push_back(input.substring(lastIndex + 1));
-            // Exit the loop when there are no more delims
-            break;
-        } else {  // delim found
-            // If this is the first delim, lastIndex+1 == 0, so starts from beginning
-            // Otherwise, starts from last found delim with lastIndex+1
-            args.push_back(input.substring(lastIndex + 1, index));
-        }
-    }
-
-    // output is via vector<String>& args
-}
+void parseInput(const String input, std::vector<String>& args);
 
 /**
  * @brief Converts ADC reading to voltage based on a voltage divider
@@ -169,20 +162,14 @@ void parseInput(const String input, std::vector<String>& args, const char delim)
  * @param r2 Resistance of R2 in the voltage divider (in kOhms)
  * @return float Voltage calculated from the ADC reading
  */
-float convertADC(uint16_t reading, const float r1, const float r2) {
-    if (reading == 0)
-        return 0;  // Avoid divide by zero
+float convertADC(uint16_t reading, const float r1, const float r2);
 
-    // Max Vs that the voltage divider is designed to read
-    const float maxSource = (3.3 * (r1 * 1000 + r2 * 1000)) / (r2 * 1000);
 
-    // ADC range is 0-4095 (12-bit precision)
-    return (static_cast<float>(reading) / 4095.0) * maxSource;  // Clamp reading [0-maxSource]
-}
-
+//------------------------------------------------------------------------------------------------//
+// Stopwatch
 
 // Whether or not to print on every stopwatch action
-#define STOPWATCH_PRINT
+// #define STOPWATCH_PRINT
 // Serial(*) to use for stopwatch printouts
 #define STOPWATCH_SERIAL Serial
 
@@ -193,127 +180,46 @@ private:
     std::vector<ASTRA_TIME_T> lap_times;
 
 public:
-    void printMicros(ASTRA_TIME_T stamp) const {
-        if (stamp < 2000) {  // < 2 ms
-            STOPWATCH_SERIAL.print(stamp);
-            STOPWATCH_SERIAL.print(" μs");
-        } else if (stamp < 2 * 1000 * 1000) {  // < 2 s
-            STOPWATCH_SERIAL.print(stamp / 1000.0);
-            STOPWATCH_SERIAL.print(" ms");
-        } else if (stamp < 2 * 1000 * 1000 * 60) {  // < 2 min
-            STOPWATCH_SERIAL.print(stamp / (1000.0 * 1000.0));
-            STOPWATCH_SERIAL.print(" s");
-        } else {  // >= 2 min
-            STOPWATCH_SERIAL.print(stamp / (1000.0 * 1000.0 * 60.0));
-            STOPWATCH_SERIAL.print(" min");
-        }
-    }
+    void printMicros(ASTRA_TIME_T stamp) const;
 
     /**
      * @brief Resets all values and starts stopwatch at current micros()
      *
      * @return ASTRA_TIME_T start_time = micros()
      */
-    ASTRA_TIME_T start() {
-        start_time = micros();
-        stop_time = 0;
-        lap_times.clear();
-
-#ifdef STOPWATCH_PRINT
-        STOPWATCH_SERIAL.print("Stopwatch started at ");
-        printMicros(start_time);
-        STOPWATCH_SERIAL.println();
-#endif
-
-        return start_time;
-    }
+    ASTRA_TIME_T start();
 
     /**
      * @brief Records current micros() as a lap time
      *
      * @return ASTRA_TIME_T lap_time = micros()
      */
-    ASTRA_TIME_T lap() {
-        ASTRA_TIME_T lap_time = micros();
-        lap_times.push_back(lap_time);
-
-#ifdef STOPWATCH_PRINT
-        STOPWATCH_SERIAL.print("Stopwatch lapped (");
-        STOPWATCH_SERIAL.print(lap_times.size()-1);
-        STOPWATCH_SERIAL.print(") at ");
-        printMicros(lap_time);
-        STOPWATCH_SERIAL.println();
-#endif
-
-        return lap_time;
-    }
+    ASTRA_TIME_T lap();
 
     /**
      * @brief Records the current micros() as the stop time and prints summary
      *
      * @return ASTRA_TIME_T elapsed_time = micros() - start_time
      */
-    ASTRA_TIME_T stop() {
-        stop_time = micros();
-
-#ifdef STOPWATCH_PRINT
-        STOPWATCH_SERIAL.print("Stopwatch stopped.");
-
-        printSummary();
-#endif
-
-        return stop_time - start_time;
-    }
+    ASTRA_TIME_T stop();
 
     /**
      * @brief Prints stopwatch summary to STOPWATCH_SERIAL
      * 
      */
-    void printSummary() const {
-        STOPWATCH_SERIAL.println("Stopwatch status:");
-        STOPWATCH_SERIAL.print("Started at ");
-        printMicros(start_time);
-        STOPWATCH_SERIAL.println();
+    void printSummary() const;
 
-        if (lap_times.size() > 0) {
-            for (const auto& i : lap_times) {
-                STOPWATCH_SERIAL.print("Lap ");
-                STOPWATCH_SERIAL.print(i + 1);
-                STOPWATCH_SERIAL.print(" at ");
-                printMicros(lap_times[i]);
-                STOPWATCH_SERIAL.print(": ");
-                if (i == 0)
-                    printMicros(lap_times[i] - start_time);
-                else
-                    printMicros(lap_times[i] - lap_times[i - 1]);
-                STOPWATCH_SERIAL.println();
-            }
-        }
-
-        STOPWATCH_SERIAL.print("Stopped at ");
-        printMicros(stop_time);
-        if (lap_times.size() > 0) {
-            STOPWATCH_SERIAL.print(": ");
-            printMicros(stop_time - lap_times.back());
-            STOPWATCH_SERIAL.println();
-        } else {
-            STOPWATCH_SERIAL.println();
-        }
-
-        STOPWATCH_SERIAL.print("Elapsed time: ");
-        printMicros(stop_time - start_time);
-        STOPWATCH_SERIAL.println();
-    }
-
-    ASTRA_TIME_T getStartTime() const {
+    inline ASTRA_TIME_T getStartTime() const {
         return start_time;
     }
 
-    ASTRA_TIME_T getStopTime() const {
+    inline ASTRA_TIME_T getStopTime() const {
         return stop_time;
     }
 
-    ASTRA_TIME_T getElapsedTime() const {
+    inline ASTRA_TIME_T getElapsedTime() const {
         return stop_time - start_time;
     }
-} stopwatch;
+};
+
+extern Stopwatch_t stopwatch;
