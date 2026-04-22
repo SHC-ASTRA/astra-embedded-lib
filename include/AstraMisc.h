@@ -99,6 +99,8 @@ static constexpr int16_t IS_MAINDIRTY_CODE = (PROJECT_VERSION_ISMAIN) | (PROJECT
 
 // Seeing as how I am retarded and made VicCAN solely a header file, I can only use it in main.cpp.
 // So, macro it is.
+// All of the following macros except for the build timestamp are acquired from git at compile time
+// by extra_script.py for both astra-embedded-lib and the embedded project repo.
 #define SEND_VERSION_INFO                                                                                 \
     vicCAN.send(CMD_VERSION_COMMIT, PROJECT_VERSION_COMMIT_HASH_LOWER, PROJECT_VERSION_COMMIT_HASH_UPPER, \
         ASTRA_LIB_VERSION_COMMIT_HASH_LOWER, ASTRA_LIB_VERSION_COMMIT_HASH_UPPER);                        \
