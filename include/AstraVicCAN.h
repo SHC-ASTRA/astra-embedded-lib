@@ -13,12 +13,8 @@
 
 #include <vector>  // For std::vector<String> args from relayFromSerial()
 
-#if __has_include("unilib/can_defs.hpp")
-#   include "unilib/can_defs.hpp"
+#include "unilib/can_defs.hpp"
 using namespace unilib;
-#else
-#   include "unilib_fallback.h"
-#endif
 
 
 // How many decimal places to include in data from rover
