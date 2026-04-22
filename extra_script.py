@@ -9,7 +9,7 @@ from sys import stderr
 from warnings import warn
 from inspect import getframeinfo, stack
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
     env: Any
@@ -25,11 +25,13 @@ DEBUG = False
 
 def main():
     debug_print("DEBUGGING ENABLED: This is how you will see debug messages.")
-    setup_lib_versioning()  # Called as a part of *-embedded-Lib build process
+
+    # Called as a part of *-embedded-Lib build process
+    setup_versioning("ASTRA_LIB", lambda s: s.endswith("-embedded-lib"))
 
     old_wd = os.getcwd()
     os.chdir(global_env.subst("$BUILD_DIR"))
-    setup_project_versioning()
+    setup_versioning("PROJECT", lambda s: ("-embedded" in s or s.startswith("rover-")))
 
     os.chdir(old_wd)
 
@@ -109,11 +111,11 @@ def detect_versioning():
     )
 
 
-def setup_lib_versioning():
+def setup_versioning(define_prefix: str, repo_check: Callable[[str], bool]):
     # First, check the repository name
     repo_name = get_repo_name()
 
-    if repo_name and repo_name.lower().endswith("-embedded-lib"):
+    if repo_name and repo_check(repo_name.lower()):
         (
             version_major,
             version_minor,
@@ -124,7 +126,7 @@ def setup_lib_versioning():
             hash_parts,
         ) = detect_versioning()
     else:
-        warn("Repository name mismatch. crying.")
+        warn(f"{define_prefix} repository name mismatch. crying.")
         version_major = 0
         version_minor = 0
         version_patch = 0
@@ -134,59 +136,18 @@ def setup_lib_versioning():
         hash_parts = (0, 0)
 
     debug_print(
-        f"Got version for astra-embedded-lib: {version_major}.{version_minor}.{version_patch}, is_main={is_main}, is_dirty={is_dirty}, hash={commit_hash}"
+        f"Got version for {define_prefix}: {version_major}.{version_minor}.{version_patch}, is_main={is_main}, is_dirty={is_dirty}, hash={commit_hash}"
     )
 
     append_version_defines(
         [
-            ("ASTRA_LIB_VERSION_MAJOR", version_major),
-            ("ASTRA_LIB_VERSION_MINOR", version_minor),
-            ("ASTRA_LIB_VERSION_PATCH", version_patch),
-            ("ASTRA_LIB_VERSION_ISMAIN", is_main),
-            ("ASTRA_LIB_VERSION_ISDIRTY", is_dirty),
-            ("ASTRA_LIB_VERSION_COMMIT_HASH_LOWER", hash_parts[0]),
-            ("ASTRA_LIB_VERSION_COMMIT_HASH_UPPER", hash_parts[1]),
-        ]
-    )
-
-
-def setup_project_versioning():
-    # First, check the repository name
-    repo_name = get_repo_name()
-
-    if repo_name and ("-embedded" in repo_name or repo_name.startswith("rover-")):
-        (
-            version_major,
-            version_minor,
-            version_patch,
-            is_main,
-            is_dirty,
-            commit_hash,
-            hash_parts,
-        ) = detect_versioning()
-    else:
-        warn("Repository name mismatch. crying.")
-        version_major = 0
-        version_minor = 0
-        version_patch = 0
-        is_main = 0
-        is_dirty = 0
-        commit_hash = 0
-        hash_parts = (0, 0)
-
-    debug_print(
-        f"Got version for project: {version_major}.{version_minor}.{version_patch}, is_main={is_main}, is_dirty={is_dirty}, hash={commit_hash}"
-    )
-
-    append_version_defines(
-        [
-            ("PROJECT_VERSION_MAJOR", version_major),
-            ("PROJECT_VERSION_MINOR", version_minor),
-            ("PROJECT_VERSION_PATCH", version_patch),
-            ("PROJECT_VERSION_ISMAIN", is_main),
-            ("PROJECT_VERSION_ISDIRTY", is_dirty),
-            ("PROJECT_VERSION_COMMIT_HASH_LOWER", hash_parts[0]),
-            ("PROJECT_VERSION_COMMIT_HASH_UPPER", hash_parts[1]),
+            (f"{define_prefix}_VERSION_MAJOR", version_major),
+            (f"{define_prefix}_VERSION_MINOR", version_minor),
+            (f"{define_prefix}_VERSION_PATCH", version_patch),
+            (f"{define_prefix}_VERSION_ISMAIN", is_main),
+            (f"{define_prefix}_VERSION_ISDIRTY", is_dirty),
+            (f"{define_prefix}_VERSION_COMMIT_HASH_LOWER", hash_parts[0]),
+            (f"{define_prefix}_VERSION_COMMIT_HASH_UPPER", hash_parts[1]),
         ]
     )
 
