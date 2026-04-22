@@ -3,6 +3,7 @@
 
 import subprocess
 import os
+import struct
 from pathlib import Path
 from sys import stderr
 from warnings import warn
@@ -60,6 +61,7 @@ def detect_versioning():
     version_major = 0
     version_minor = 0
     version_patch = 0
+    hash_parts = (0, 0)
 
     # Set release major/minor/patch
     if git_release.returncode == 0:
@@ -89,13 +91,22 @@ def detect_versioning():
         ["git", "rev-parse", "HEAD"], capture_output=True, text=True
     )
     if git_hash.returncode == 0:
-        commit_hash = git_hash.stdout.strip()[-7:]
+        commit_hash = git_hash.stdout.strip()[:8]
         debug_print(f"Current Git commit hash: {commit_hash}")
         commit_hash = int(commit_hash, 16)  # convert hex string to integer
+        hash_parts = struct.unpack("<hh", commit_hash.to_bytes(4, "big"))
     else:
         warn("Warning: Could not determine git commit hash.")
 
-    return (version_major, version_minor, version_patch, is_main, is_dirty, commit_hash)
+    return (
+        version_major,
+        version_minor,
+        version_patch,
+        is_main,
+        is_dirty,
+        commit_hash,
+        hash_parts,
+    )
 
 
 def setup_lib_versioning():
@@ -103,9 +114,15 @@ def setup_lib_versioning():
     repo_name = get_repo_name()
 
     if repo_name and repo_name.lower().endswith("-embedded-lib"):
-        version_major, version_minor, version_patch, is_main, is_dirty, commit_hash = (
-            detect_versioning()
-        )
+        (
+            version_major,
+            version_minor,
+            version_patch,
+            is_main,
+            is_dirty,
+            commit_hash,
+            hash_parts,
+        ) = detect_versioning()
     else:
         warn("Repository name mismatch. crying.")
         version_major = 0
@@ -114,6 +131,7 @@ def setup_lib_versioning():
         is_main = 0
         is_dirty = 0
         commit_hash = 0
+        hash_parts = (0, 0)
 
     debug_print(
         f"Got version for astra-embedded-lib: {version_major}.{version_minor}.{version_patch}, is_main={is_main}, is_dirty={is_dirty}, hash={commit_hash}"
@@ -126,7 +144,8 @@ def setup_lib_versioning():
             ("ASTRA_LIB_VERSION_PATCH", version_patch),
             ("ASTRA_LIB_VERSION_ISMAIN", is_main),
             ("ASTRA_LIB_VERSION_ISDIRTY", is_dirty),
-            ("ASTRA_LIB_VERSION_COMMIT_HASH", commit_hash),
+            ("ASTRA_LIB_VERSION_COMMIT_HASH_LOWER", hash_parts[0]),
+            ("ASTRA_LIB_VERSION_COMMIT_HASH_UPPER", hash_parts[1]),
         ]
     )
 
@@ -136,9 +155,15 @@ def setup_project_versioning():
     repo_name = get_repo_name()
 
     if repo_name and ("-embedded" in repo_name or repo_name.startswith("rover-")):
-        version_major, version_minor, version_patch, is_main, is_dirty, commit_hash = (
-            detect_versioning()
-        )
+        (
+            version_major,
+            version_minor,
+            version_patch,
+            is_main,
+            is_dirty,
+            commit_hash,
+            hash_parts,
+        ) = detect_versioning()
     else:
         warn("Repository name mismatch. crying.")
         version_major = 0
@@ -147,6 +172,7 @@ def setup_project_versioning():
         is_main = 0
         is_dirty = 0
         commit_hash = 0
+        hash_parts = (0, 0)
 
     debug_print(
         f"Got version for project: {version_major}.{version_minor}.{version_patch}, is_main={is_main}, is_dirty={is_dirty}, hash={commit_hash}"
@@ -159,7 +185,8 @@ def setup_project_versioning():
             ("PROJECT_VERSION_PATCH", version_patch),
             ("PROJECT_VERSION_ISMAIN", is_main),
             ("PROJECT_VERSION_ISDIRTY", is_dirty),
-            ("PROJECT_VERSION_COMMIT_HASH", commit_hash),
+            ("PROJECT_VERSION_COMMIT_HASH_LOWER", hash_parts[0]),
+            ("PROJECT_VERSION_COMMIT_HASH_UPPER", hash_parts[1]),
         ]
     )
 

@@ -99,8 +99,9 @@ static constexpr int16_t IS_MAINDIRTY_CODE = (PROJECT_VERSION_ISMAIN) | (PROJECT
 
 // Seeing as how I am retarded and made VicCAN solely a header file, I can only use it in main.cpp.
 // So, macro it is.
-#define SEND_VERSION_INFO \
-    vicCAN.send(CMD_VERSION_COMMIT, PROJECT_VERSION_COMMIT_HASH, ASTRA_LIB_VERSION_COMMIT_HASH); \
+#define SEND_VERSION_INFO                                                                                 \
+    vicCAN.send(CMD_VERSION_COMMIT, PROJECT_VERSION_COMMIT_HASH_LOWER, PROJECT_VERSION_COMMIT_HASH_UPPER, \
+        ASTRA_LIB_VERSION_COMMIT_HASH_LOWER, ASTRA_LIB_VERSION_COMMIT_HASH_UPPER);                        \
     vicCAN.send(CMD_VERSION_BUILD, BUILD_TIMESTAMP, IS_MAINDIRTY_CODE);
 
 
