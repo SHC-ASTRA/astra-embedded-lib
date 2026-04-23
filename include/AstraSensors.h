@@ -88,7 +88,10 @@ void pullBMPData(Adafruit_BMP3XX &bmp, float (&bmp_data)[3]);
 
 float getBNOOrient(Adafruit_BNO055 &bno);
 
+[[deprecated("Use getPosition(SFE_UBLOX_GNSS &myGNSS, double (&gps_data)[4]) instead")]]
 void getPosition(SFE_UBLOX_GNSS &myGNSS, double (&gps_data)[3]);
+void getPosition(SFE_UBLOX_GNSS &myGNSS, double (&gps_data)[4]);
+
 
 String getUTC(SFE_UBLOX_GNSS &myGNSS);
 

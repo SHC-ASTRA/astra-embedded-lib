@@ -213,6 +213,13 @@ void getPosition(SFE_UBLOX_GNSS &myGNSS, double (&gps_data)[3]) {
     gps_data[2] = uint8_t(myGNSS.getSIV());
 }
 
+void getPosition(SFE_UBLOX_GNSS &myGNSS, double (&gps_data)[4]) {
+    gps_data[0] = myGNSS.getLatitude() / 10000000.0;
+    gps_data[1] = myGNSS.getLongitude() / 10000000.0;
+    gps_data[2] = myGNSS.getAltitude() / 1000.0;
+    gps_data[3] = uint8_t(myGNSS.getSIV());
+}
+
 String getUTC(SFE_UBLOX_GNSS &myGNSS) {
     return String(myGNSS.getHour()) + "-" + String(myGNSS.getMinute()) + "-" +
            String(myGNSS.getSecond());
