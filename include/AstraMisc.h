@@ -32,10 +32,6 @@ typedef unsigned long ASTRA_TIME_T;
 // It has been sent through hell to be strictly compile-time in a pre-C++14 world.
 // I hate it, but it does work.
 
-// TODO: move these to unilib
-const uint8_t CMD_VERSION_COMMIT = 7;
-const uint8_t CMD_VERSION_BUILD = 8;
-
 const int EPOCH_YEAR = 2022;
 const int EPOCH_MONTH = 1;  // Month does not work correctly if changed
 const int EPOCH_DATE = 1;
