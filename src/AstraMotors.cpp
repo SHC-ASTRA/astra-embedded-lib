@@ -41,6 +41,15 @@ void AstraMotors::setDuty(float val) {  // controller input value
 }
 
 
+void AstraMotors::setSlowStatusPeriods() {
+    CAN_setStatusPeriod(motorID, sparkMax_PeriodicFrame::kStatus0, 100);
+    CAN_setStatusPeriod(motorID, sparkMax_PeriodicFrame::kStatus1, 100);
+    CAN_setStatusPeriod(motorID, sparkMax_PeriodicFrame::kStatus2, 100);
+    CAN_setStatusPeriod(motorID, sparkMax_PeriodicFrame::kStatus3, 100);
+    CAN_setStatusPeriod(motorID, sparkMax_PeriodicFrame::kStatus4, 100);
+    // The rest are already slower than 200 ms
+}
+
 void AstraMotors::sendDuty(float val) {
     setDuty(val);
     currentDutyCycle = targetDutyCycle;

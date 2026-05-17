@@ -119,6 +119,8 @@ class AstraMotors {
     //---------------------------------------------//
     //  Controlling physical motor
     //---------------------------------------------//
+
+    void setSlowStatusPeriods();  // Set status frame periods to 100 ms for motor on main
     
     // Send the identify command to the SparkMax; makes it flash its LED purple and white
     inline void identify() {

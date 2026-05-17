@@ -70,12 +70,19 @@ void CAN_setParameter(uint8_t deviceId, sparkMax_ConfigParameter parameterID,
         frame[0] = value ? 1 : 0;
     }
 
-    CAN_sendPacket(deviceId, static_cast<uint8_t>(parameterID) | 0x300, frame, 5);
+    CAN_sendPacket(deviceId, static_cast<uint32_t>(parameterID) | 0x300, frame, 5);
 }
 
 void CAN_reqParameter(uint8_t deviceId, sparkMax_ConfigParameter parameterID) {
     uint8_t frame[8] = {0};
-    CAN_sendPacket(deviceId, static_cast<uint8_t>(parameterID) | 0x300, frame, 0);
+    CAN_sendPacket(deviceId, static_cast<uint32_t>(parameterID) | 0x300, frame, 0);
+}
+
+void CAN_setStatusPeriod(uint8_t deviceId, sparkMax_PeriodicFrame frameId, int periodMs) {
+    uint8_t frame[8] = {0};
+    frame[0] = periodMs & 0xFF;
+    frame[1] = (periodMs >> 8) & 0xFF;
+    CAN_sendPacket(deviceId, sparkMax_statusFrame_baseId + static_cast<uint32_t>(frameId), frame, 2);
 }
 
 

@@ -66,6 +66,25 @@ void CAN_setParameter(uint8_t deviceId, sparkMax_ConfigParameter parameterID, sp
  */
 void CAN_reqParameter(uint8_t deviceId, sparkMax_ConfigParameter parameterID);
 
+/**
+ * @brief Set the period of a periodic status frame on the specified SparkMax device
+ *
+ * These are the default periods, in ms:
+ * Status0 - 10
+ * Status1 - 20
+ * Status2 - 20
+ * Status3 - 50
+ * Status4 - 20
+ * Status5 - 200
+ * Status6 - 200
+ * Status7 - 250
+ *
+ * @param deviceId REV ID
+ * @param frameId The ID of the periodic status frame to set the period of
+ * @param periodMs The period to set for the specified periodic status frame, in milliseconds
+ */
+void CAN_setStatusPeriod(uint8_t deviceId, sparkMax_PeriodicFrame frameId, int periodMs);
+
 
 //-------------------------------------//
 //  Backwards Compatibility Functions  //
