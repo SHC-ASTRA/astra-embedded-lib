@@ -8,6 +8,7 @@
 #include <Arduino.h>
 
 
+// https://docs.revrobotics.com/brushless/spark-max/operating-modes#brake-coast-mode-idle-behavior
 enum class sparkMax_IdleMode {
     kCoast = 0,
     kBrake = 1
@@ -43,6 +44,7 @@ enum class sparkMax_ctrlType {
     kSmartMotion = 0x52
 };
 
+// https://docs.revrobotics.com/brushless/spark-max/control-interfaces#periodic-status-frames
 enum class sparkMax_PeriodicFrame {
     kStatus0 = 0,
     kStatus1 = 1,
@@ -94,6 +96,7 @@ enum class sparkMax_ParameterType : uint8_t {
     kBool = 0x3,
 };
 
+// https://docs.revrobotics.com/brushless/spark-max/parameters
 enum class sparkMax_ConfigParameter : int32_t {
     kCanID = 0x0,
     kInputMode = 0x1,
