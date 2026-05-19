@@ -378,6 +378,24 @@ class VicCanController {
      * @brief Extends readCanFrame() to check destination of CAN Frame, relays stray CAN frames
      * to Serial if relayMode is on, and checks for a queued frame from relayFromSerial().
      *
+     * (Non-REVCAN compatible variant)
+     *
+     * @return true upon reading a CAN frame for this MCU;
+     * @return false upon not finding a CAN frame or only reading one for a different MCU
+     */
+    inline bool readCan() {
+        bool isREV;
+        CanFrame rawFrame;
+        return readCan(&isREV, &rawFrame);
+    }
+
+    /**
+     * @brief Extends readCanFrame() to check destination of CAN Frame, relays stray CAN frames
+     * to Serial if relayMode is on, and checks for a queued frame from relayFromSerial().
+     *
+     * @param isREV [out] whether the frame read is a REV CAN frame
+     * @param outFrame [out] the raw CAN frame read, for use with REV CAN frames that need to be parsed by loop()
+     *
      * @return true upon reading a CAN frame for this MCU;
      * @return false upon not finding a CAN frame or only reading one for a different MCU
      */
