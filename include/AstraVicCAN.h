@@ -284,12 +284,13 @@ class VicCanFrame {
      * @return true if a frame is successfully read;
      * @return false if no frame is received.
      */
-    bool readCan() {
+    bool readCan(CanFrame* rawFrame) {
         static CanFrame inFrame;
         if (!ESP32Can.readFrame(inFrame, 0))
             return false;  // No CAN frame received
 
         parseCanFrame(inFrame);
+        *rawFrame = inFrame;
         return true;
     }
 #endif
@@ -377,10 +378,28 @@ class VicCanController {
      * @brief Extends readCanFrame() to check destination of CAN Frame, relays stray CAN frames
      * to Serial if relayMode is on, and checks for a queued frame from relayFromSerial().
      *
+     * (Non-REVCAN compatible variant)
+     *
      * @return true upon reading a CAN frame for this MCU;
      * @return false upon not finding a CAN frame or only reading one for a different MCU
      */
-    bool readCan() {
+    inline bool readCan() {
+        bool isREV;
+        CanFrame rawFrame;
+        return readCan(&isREV, &rawFrame);
+    }
+
+    /**
+     * @brief Extends readCanFrame() to check destination of CAN Frame, relays stray CAN frames
+     * to Serial if relayMode is on, and checks for a queued frame from relayFromSerial().
+     *
+     * @param isREV [out] whether the frame read is a REV CAN frame
+     * @param outFrame [out] the raw CAN frame read, for use with REV CAN frames that need to be parsed by loop()
+     *
+     * @return true upon reading a CAN frame for this MCU;
+     * @return false upon not finding a CAN frame or only reading one for a different MCU
+     */
+    bool readCan(bool* isREV, CanFrame* outFrame) {
         // Check for queued frame from relayFromSerial()
         if (relayFrameWaiting) {
             relayFrameWaiting = false;
@@ -390,7 +409,7 @@ class VicCanController {
             return true;  // Use inVicCanFrame already set by relayFromSerial()
         }
 
-#ifdef CAN_AVAILABLE
+// #ifdef CAN_AVAILABLE
         // Run through up to 5 messages on the CAN network.
         // If one is found to act on, break and return true.
         // If a read fails, there are no more messages to read; return false.
@@ -401,8 +420,10 @@ class VicCanController {
         int count = 0;
         while (count++, count < 5) {
             // Check CAN network for a frame
-            if (!inVicCanFrame.readCan())
+            if (!inVicCanFrame.readCan(outFrame)) {
+                *isREV = false;
                 return false;  // No CAN frame received
+            }
 
 #   ifdef VICCAN_DEBUG
             Serial.println("Received CAN frame: ");
@@ -411,7 +432,7 @@ class VicCanController {
 
             // Relay stray CAN frames to Serial if relayMode is on
             // Broadcast messages are specifically not relayed.
-            if (!inVicCanFrame.isForMe()) {
+            if (!outFrame->extd && !inVicCanFrame.isForMe()) {
                 if (relayMode) {
 #   ifdef VICCAN_DEBUG
                     Serial.println("Relaying from CAN to Serial:");
@@ -420,12 +441,17 @@ class VicCanController {
                     relayToSerial(inVicCanFrame);
                 }
                 continue;  // Not for us; try to process the next message
+            } else if (outFrame->extd) {
+                // REV CAN Frame; don't do anything, let loop() parse it with *outFrame
+                *isREV = true;
+                return false;
             }
 
             // We have a CAN command that we should act on.
+            *isREV = false;
             return true;
         }
-#endif
+// #endif
         return false;
     }
 

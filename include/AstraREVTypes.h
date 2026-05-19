@@ -1,13 +1,14 @@
 /**
  * @file AstraREVTypes.h
  * @author David Sharpe (ds0196@uah.edu)
- * @brief 
- * 
+ * @brief
+ *
  */
 
 #include <Arduino.h>
 
 
+// https://docs.revrobotics.com/brushless/spark-max/operating-modes#brake-coast-mode-idle-behavior
 enum class sparkMax_IdleMode {
     kCoast = 0,
     kBrake = 1
@@ -42,6 +43,20 @@ enum class sparkMax_ctrlType {
     kCurrent = 0x43,
     kSmartMotion = 0x52
 };
+
+// https://docs.revrobotics.com/brushless/spark-max/control-interfaces#periodic-status-frames
+enum class sparkMax_PeriodicFrame {
+    kStatus0 = 0,
+    kStatus1 = 1,
+    kStatus2 = 2,
+    kStatus3 = 3,
+    kStatus4 = 4,
+    kStatus5 = 5,
+    kStatus6 = 6,
+    kStatus7 = 7
+};
+
+constexpr int sparkMax_statusFrame_baseId = 0x60;  // Base ID for status frames; actual ID is base + frame number
 
 struct motorStatus0 {
     double appliedOutput;
@@ -81,6 +96,7 @@ enum class sparkMax_ParameterType : uint8_t {
     kBool = 0x3,
 };
 
+// https://docs.revrobotics.com/brushless/spark-max/parameters
 enum class sparkMax_ConfigParameter : int32_t {
     kCanID = 0x0,
     kInputMode = 0x1,
