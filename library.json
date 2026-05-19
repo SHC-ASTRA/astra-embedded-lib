@@ -1,12 +1,12 @@
 {
     "$schema": "https://raw.githubusercontent.com/platformio/platformio-core/develop/platformio/assets/schema/library.json",
     "name": "astra-Embedded-Lib",
-    "version": "1.0.1",
+    "version": "0.0.0",
     "description": "ASTRA's library for embedded code",
     "repository":
     {
         "type": "git",
-        "url": "https://github.com/SHC-ASTRA/astra-Embedded-Lib"
+        "url": "https://github.com/SHC-ASTRA/astra-embedded-lib"
     },
     "authors":
     [
@@ -30,7 +30,7 @@
     "license": "AGPL-3.0-only",
     "frameworks": "arduino",
     "dependencies": {
-        "unilib": "https://github.com/SHC-ASTRA/unilib.git"
+        "unilib": "https://github.com/SHC-ASTRA/unilib.git#v1.0.0"
     },
     "build": {
         "extraScript": "extra_script.py"
