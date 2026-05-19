@@ -1,7 +1,7 @@
 /**
  * @file AstraNP.cpp
  * @author David Sharpe (ds0196@uah.edu)
- * @brief 
+ * @brief
  *
  */
 #include "AstraNP.h"
@@ -73,7 +73,7 @@ void AstraNeoPixel::update() {
 
     // if still on current status
     if (currTime < statusEndTime) {
-        float startTime;  // Start time for current cycle
+        float startTime;                                             // Start time for current cycle
         if (currTime < startOfSecCycle - offTime * BET_CYCLE_LEN) {  // first cycle
             startTime = realStartTime;
         } else if (currTime < startOfSecCycle) {  // between cycles
@@ -83,9 +83,9 @@ void AstraNeoPixel::update() {
             startTime = startOfSecCycle;
         }
 
-        if (currTime < startTime + onTime) { // first color
+        if (currTime < startTime + onTime) {  // first color
             writeColor(status[currentStatus].color1);
-        } else if (currTime < startTime + onTime + offTime) { // off time
+        } else if (currTime < startTime + onTime + offTime) {  // off time
             writeColor(0x0);
         } else {  // second color
             writeColor(status[currentStatus].color2);
@@ -115,7 +115,7 @@ void AstraNeoPixel::update() {
         currentStatus = 0;
 
     status[currentStatus].startTime = currTime + LIMBO_TIME;  // Next status will start after limbo
-    
+
     // Enter limbo
     limboStart = currTime;
 }

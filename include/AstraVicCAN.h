@@ -3,8 +3,10 @@
  * @author David Sharpe (ds0196@uah.edu)
  * @brief Easily communicate over ASTRA Vehicle CAN
  *
- * VicCAN standard is outlined here: https://docs.google.com/spreadsheets/d/1jHHier_8mMmTDISywsfqXBYcWRiQC8k8O-At4GGrdkI/edit?usp=sharing
- * A few examples are outlined here: https://docs.google.com/document/d/1NNIyvmUF-G32Z_FQDlSaTPBeQd0kKnsuYawkYdrqaOM/edit?usp=sharing
+ * VicCAN standard is outlined here:
+ * https://docs.google.com/spreadsheets/d/1jHHier_8mMmTDISywsfqXBYcWRiQC8k8O-At4GGrdkI/edit?usp=sharing A few
+ * examples are outlined here:
+ * https://docs.google.com/document/d/1NNIyvmUF-G32Z_FQDlSaTPBeQd0kKnsuYawkYdrqaOM/edit?usp=sharing
  *
  */
 #pragma once
@@ -19,18 +21,18 @@ using namespace unilib;
 
 // How many decimal places to include in data from rover
 #ifndef FEEDBACK_PRECISION
-#   define FEEDBACK_PRECISION 7
+#    define FEEDBACK_PRECISION 7
 #endif
 
 #if (defined(ESP32) && __has_include("ESP32-TWAI-CAN.hpp"))
-#   define CAN_AVAILABLE
-#   include "AstraCAN.h"  // For CAN library and printCANframe()
+#    define CAN_AVAILABLE
+#    include "AstraCAN.h"  // For CAN library and printCANframe()
 #else
-#   warning "Could not find a compatible CAN library. VicCAN will be limited to Serial use only."
+#    warning "Could not find a compatible CAN library. VicCAN will be limited to Serial use only."
 #endif
 
 #ifdef VICCAN_DEBUG
-#   warning "VICCAN_DEBUG is enabled. good luck soldier."
+#    warning "VICCAN_DEBUG is enabled. good luck soldier."
 #endif
 
 
@@ -52,7 +54,7 @@ using namespace unilib;
 
 /**
  * @brief Takes a MCU name in string form (i.e., "core"), and turns it into a MCU ID enum, if valid
- * 
+ *
  * @param str String containing only the MCU name, all lower case
  * @param mcuID CanMcuId enum output corresponding to MCU name, if valid
  * @return true on valid MCU name;
@@ -63,7 +65,7 @@ bool mcuIdFromString(String str, CanMcuId* mcuID) {
         return false;
 
     str.toLowerCase();  // Make it case-insensitive
-    
+
     if (str == "broadcast")
         *mcuID = CanMcuId::MCU_BROADCAST;
     else if (str == "core")
@@ -78,13 +80,13 @@ bool mcuIdFromString(String str, CanMcuId* mcuID) {
         *mcuID = CanMcuId::MCU_CITADEL;
     else
         return false;
-    
+
     return true;
 }
 
 /**
  * @brief Takes a MCU ID enum and converts it into a MCU name in String form (i.e., "core")
- * 
+ *
  * @param mcuID MCU ID enum
  * @return String containing only the name of the MCU
  */
@@ -117,7 +119,7 @@ String mcuIdToString(const CanMcuId mcuID) {
 class VicCanFrame {
    public:
     // Within CAN ID
-    CanMcuId mcuId;           // 3 bits
+    CanMcuId mcuId;        // 3 bits
     CanDataType dataType;  // 2 bits
     uint8_t cmdId;         // 6 bits
     // Built-in to CAN frame
@@ -133,7 +135,7 @@ class VicCanFrame {
 
     /**
      * @brief Resets all data values; mainly for use with static keyword
-     * 
+     *
      */
     void clear() {
         mcuId = CanMcuId::MCU_BROADCAST;
@@ -167,57 +169,35 @@ class VicCanFrame {
 
         if (dlc == 0 || dataType == CanDataType::DT_NONE) {
             // No data to parse
-        }
-        else if (dataType == CanDataType::DT_1f64) {  // 1 double
-            uint64_t udata =
-               (static_cast<uint64_t>(data[0]) << 56) |
-               (static_cast<uint64_t>(data[1]) << 48) |
-               (static_cast<uint64_t>(data[2]) << 40) |
-               (static_cast<uint64_t>(data[3]) << 32) |
-               (static_cast<uint64_t>(data[4]) << 24) |
-               (static_cast<uint64_t>(data[5]) << 16) |
-               (static_cast<uint64_t>(data[6]) << 8) |
-               (static_cast<uint64_t>(data[7]) << 0);
+        } else if (dataType == CanDataType::DT_1f64) {  // 1 double
+            uint64_t udata = (static_cast<uint64_t>(data[0]) << 56) | (static_cast<uint64_t>(data[1]) << 48) |
+                             (static_cast<uint64_t>(data[2]) << 40) | (static_cast<uint64_t>(data[3]) << 32) |
+                             (static_cast<uint64_t>(data[4]) << 24) | (static_cast<uint64_t>(data[5]) << 16) |
+                             (static_cast<uint64_t>(data[6]) << 8) | (static_cast<uint64_t>(data[7]) << 0);
             outData.push_back(static_cast<double>(*reinterpret_cast<double*>(&udata)));  // shut up, ik
-        }
-        else if (dataType == CanDataType::DT_2f32) {  // 2 floats
-            uint32_t udata =
-               (static_cast<uint32_t>(data[0]) << 24) |
-               (static_cast<uint32_t>(data[1]) << 16) |
-               (static_cast<uint32_t>(data[2]) << 8) |
-               (static_cast<uint32_t>(data[3]) << 0);
+        } else if (dataType == CanDataType::DT_2f32) {                                   // 2 floats
+            uint32_t udata = (static_cast<uint32_t>(data[0]) << 24) | (static_cast<uint32_t>(data[1]) << 16) |
+                             (static_cast<uint32_t>(data[2]) << 8) | (static_cast<uint32_t>(data[3]) << 0);
             outData.push_back(static_cast<double>(*reinterpret_cast<float*>(&udata)));
-            udata =
-               (static_cast<uint32_t>(data[4]) << 24) |
-               (static_cast<uint32_t>(data[5]) << 16) |
-               (static_cast<uint32_t>(data[6]) << 8) |
-               (static_cast<uint32_t>(data[7]) << 0);
+            udata = (static_cast<uint32_t>(data[4]) << 24) | (static_cast<uint32_t>(data[5]) << 16) |
+                    (static_cast<uint32_t>(data[6]) << 8) | (static_cast<uint32_t>(data[7]) << 0);
             outData.push_back(static_cast<double>(*reinterpret_cast<float*>(&udata)));
-        }
-        else if (dataType == CanDataType::DT_4i16) {  // 4 ints
-            uint16_t udata =
-               (static_cast<uint16_t>(data[0]) << 8) |
-               (static_cast<uint16_t>(data[1]) << 0);
+        } else if (dataType == CanDataType::DT_4i16) {  // 4 ints
+            uint16_t udata = (static_cast<uint16_t>(data[0]) << 8) | (static_cast<uint16_t>(data[1]) << 0);
             outData.push_back(static_cast<double>(*reinterpret_cast<int16_t*>(&udata)));
-            udata =
-               (static_cast<uint16_t>(data[2]) << 8) |
-               (static_cast<uint16_t>(data[3]) << 0);
+            udata = (static_cast<uint16_t>(data[2]) << 8) | (static_cast<uint16_t>(data[3]) << 0);
             outData.push_back(static_cast<double>(*reinterpret_cast<int16_t*>(&udata)));
-            udata =
-               (static_cast<uint16_t>(data[4]) << 8) |
-               (static_cast<uint16_t>(data[5]) << 0);
+            udata = (static_cast<uint16_t>(data[4]) << 8) | (static_cast<uint16_t>(data[5]) << 0);
             outData.push_back(static_cast<double>(*reinterpret_cast<int16_t*>(&udata)));
-            udata =
-               (static_cast<uint16_t>(data[6]) << 8) |
-               (static_cast<uint16_t>(data[7]) << 0);
+            udata = (static_cast<uint16_t>(data[6]) << 8) | (static_cast<uint16_t>(data[7]) << 0);
             outData.push_back(static_cast<double>(*reinterpret_cast<int16_t*>(&udata)));
         }
     }
 
     /**
      * @brief Represents the VicCanFrame as a string; for use with Serial.println()
-     * 
-     * @return String 
+     *
+     * @return String
      */
     String toStr() {
         String res;
@@ -240,7 +220,7 @@ class VicCanFrame {
 
     /**
      * @brief Whether this mcu should care about this CAN frame
-     * 
+     *
      * @return true if the frame's MCU ID matches ours or is a broadcast;
      * @return false if the frame is intended for a different mcu only.
      */
@@ -251,7 +231,7 @@ class VicCanFrame {
 
     /**
      * @brief Take a CAN ID and parse it into its components
-     * 
+     *
      * @param id The 11-bit CAN ID to parse
      */
     void parseCanId(uint32_t id) {
@@ -263,7 +243,7 @@ class VicCanFrame {
 #ifdef CAN_AVAILABLE
     /**
      * @brief Take a CanFrame (typically from ESP32Can.read()) and parse it into its components
-     * 
+     *
      * @param frame CanFrame to parse
      */
     void parseCanFrame(CanFrame& frame) {
@@ -280,7 +260,7 @@ class VicCanFrame {
 #ifdef CAN_AVAILABLE
     /**
      * @brief Read the CAN network for a frame; automatically parses into the VicCanFrame object.
-     * 
+     *
      * @return true if a frame is successfully read;
      * @return false if no frame is received.
      */
@@ -344,7 +324,6 @@ class VicCanController {
 
 
    public:
-
     /**
      * @brief Enable relay mode (relay stray CAN frames to Serial, and send our own frames straight to Serial)
      *
@@ -394,7 +373,8 @@ class VicCanController {
      * to Serial if relayMode is on, and checks for a queued frame from relayFromSerial().
      *
      * @param isREV [out] whether the frame read is a REV CAN frame
-     * @param outFrame [out] the raw CAN frame read, for use with REV CAN frames that need to be parsed by loop()
+     * @param outFrame [out] the raw CAN frame read, for use with REV CAN frames that need to be parsed by
+     * loop()
      *
      * @return true upon reading a CAN frame for this MCU;
      * @return false upon not finding a CAN frame or only reading one for a different MCU
@@ -409,7 +389,7 @@ class VicCanController {
             return true;  // Use inVicCanFrame already set by relayFromSerial()
         }
 
-// #ifdef CAN_AVAILABLE
+        // #ifdef CAN_AVAILABLE
         // Run through up to 5 messages on the CAN network.
         // If one is found to act on, break and return true.
         // If a read fails, there are no more messages to read; return false.
@@ -425,19 +405,19 @@ class VicCanController {
                 return false;  // No CAN frame received
             }
 
-#   ifdef VICCAN_DEBUG
+#ifdef VICCAN_DEBUG
             Serial.println("Received CAN frame: ");
             Serial.println(inVicCanFrame.toStr());
-#   endif
+#endif
 
             // Relay stray CAN frames to Serial if relayMode is on
             // Broadcast messages are specifically not relayed.
             if (!outFrame->extd && !inVicCanFrame.isForMe()) {
                 if (relayMode) {
-#   ifdef VICCAN_DEBUG
+#ifdef VICCAN_DEBUG
                     Serial.println("Relaying from CAN to Serial:");
                     Serial.println(inVicCanFrame.toStr());
-#   endif
+#endif
                     relayToSerial(inVicCanFrame);
                 }
                 continue;  // Not for us; try to process the next message
@@ -451,7 +431,7 @@ class VicCanController {
             *isREV = false;
             return true;
         }
-// #endif
+        // #endif
         return false;
     }
 
@@ -464,7 +444,7 @@ class VicCanController {
         inVicCanFrame.parseData(outData);
     }
 
-    inline void printFrame(Print *interface) {
+    inline void printFrame(Print* interface) {
         interface->println(inVicCanFrame.toStr());
     }
 
@@ -488,7 +468,7 @@ class VicCanController {
 
         static std::vector<double> canData;
         vicFrame.parseData(canData);  // Load data from vicFrame into canData
-        if (!canData.empty()) {  // Only print out data if there is any
+        if (!canData.empty()) {       // Only print out data if there is any
             for (const double& data : canData) {
                 Serial.print(",");
                 Serial.print(data, FEEDBACK_PRECISION);
@@ -532,24 +512,20 @@ class VicCanController {
             if (args.size() - 3 == 0) {
                 outVicFrame.dataType = CanDataType::DT_NONE;
                 outVicFrame.dlc = 0;  // No data to encode
-            }
-            else if (args.size() - 3 == 1) {
+            } else if (args.size() - 3 == 1) {
                 outVicFrame.dataType = CanDataType::DT_1f64;
                 encodeData(outVicFrame.data, args[3].toDouble());
-            }
-            else if (args.size() - 3 == 2) {
+            } else if (args.size() - 3 == 2) {
                 outVicFrame.dataType = CanDataType::DT_2f32;
                 encodeData(outVicFrame.data, args[3].toFloat(), args[4].toFloat());
-            }
-            else if (args.size() - 3 == 3) {
+            } else if (args.size() - 3 == 3) {
                 outVicFrame.dataType = CanDataType::DT_4i16;
                 encodeData(outVicFrame.data, args[3].toInt(), args[4].toInt(), args[5].toInt(), 0);
-            }
-            else if (args.size() - 3 == 4) {
+            } else if (args.size() - 3 == 4) {
                 outVicFrame.dataType = CanDataType::DT_4i16;
-                encodeData(outVicFrame.data, args[3].toInt(), args[4].toInt(), args[5].toInt(), args[6].toInt());
-            }
-            else {
+                encodeData(outVicFrame.data, args[3].toInt(), args[4].toInt(), args[5].toInt(),
+                           args[6].toInt());
+            } else {
                 Serial.println("Invalid data length");
                 return;
             }
@@ -565,12 +541,13 @@ class VicCanController {
         }  // Continue; we may still need to relay it to the CAN network
 
 #ifdef CAN_AVAILABLE
-        // If this CAN frame is not specifically for this MCU, relay it to the CAN network (includes broadcast messages)
+        // If this CAN frame is not specifically for this MCU, relay it to the CAN network (includes broadcast
+        // messages)
         if (outVicFrame.mcuId != SUBMODULE_CAN_ID) {
-#   ifdef VICCAN_DEBUG
+#    ifdef VICCAN_DEBUG
             Serial.println("Relaying from Serial to CAN:");
             Serial.println(outVicFrame.toStr());
-#   endif
+#    endif
             outVicFrame.sendCan();
         }
 #endif
@@ -647,10 +624,10 @@ class VicCanController {
             relayToSerial(outVicFrame);
 #ifdef CAN_AVAILABLE
         }
-#   ifdef VICCAN_DEBUG
+#    ifdef VICCAN_DEBUG
         Serial.println("Sending CAN frame:");
         Serial.println(outVicFrame.toStr());
-#   endif
+#    endif
         outVicFrame.sendCan();
 #endif
     }

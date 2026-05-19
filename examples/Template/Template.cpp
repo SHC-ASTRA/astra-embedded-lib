@@ -9,8 +9,9 @@
 //  Includes  //
 //------------//
 
-#include "AstraMisc.h"
 #include "project/TEMPLATE.h"
+
+#include "AstraMisc.h"
 
 
 //------------//
@@ -139,7 +140,7 @@ void loop() {
 
         input.trim();                   // Remove preceding and trailing whitespace
         std::vector<String> args = {};  // Initialize empty vector to hold separated arguments
-        parseInput(input, args);   // Separate `input` by commas and place into args vector
+        parseInput(input, args);        // Separate `input` by commas and place into args vector
         args[0].toLowerCase();          // Make command case-insensitive
         String command = args[0];       // To make processing code more readable
 
