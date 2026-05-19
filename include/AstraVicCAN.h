@@ -41,8 +41,8 @@ using namespace unilib;
 #    define SUBMODULE_CAN_ID CanMcuId::MCU_ARM
 #elif defined(DIGIT)
 #    define SUBMODULE_CAN_ID CanMcuId::MCU_DIGIT
-#elif defined(FAERIE)
-#    define SUBMODULE_CAN_ID CanMcuId::MCU_FAERIE
+#elif defined(LANCE)
+#    define SUBMODULE_CAN_ID CanMcuId::MCU_LANCE
 #elif defined(CITADEL)
 #    define SUBMODULE_CAN_ID CanMcuId::MCU_CITADEL
 #else  // Default - no macro in platformio.ini; will only respond to broadcast messages
@@ -72,8 +72,8 @@ bool mcuIdFromString(String str, CanMcuId* mcuID) {
         *mcuID = CanMcuId::MCU_ARM;
     else if (str == "digit")
         *mcuID = CanMcuId::MCU_DIGIT;
-    else if (str == "faerie")
-        *mcuID = CanMcuId::MCU_FAERIE;
+    else if (str == "lance")
+        *mcuID = CanMcuId::MCU_LANCE;
     else if (str == "citadel")
         *mcuID = CanMcuId::MCU_CITADEL;
     else
@@ -97,8 +97,8 @@ String mcuIdToString(const CanMcuId mcuID) {
         return "arm";
     else if (mcuID == CanMcuId::MCU_DIGIT)
         return "digit";
-    else if (mcuID == CanMcuId::MCU_FAERIE)
-        return "faerie";
+    else if (mcuID == CanMcuId::MCU_LANCE)
+        return "lance";
     else if (mcuID == CanMcuId::MCU_CITADEL)
         return "citadel";
     else  // Should never run unless an MCU is added and not included in this function

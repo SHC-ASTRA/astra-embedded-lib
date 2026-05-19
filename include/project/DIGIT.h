@@ -12,7 +12,7 @@
 #   if !defined(ARDUINO_ADAFRUIT_FEATHER_ESP32_V2)
 
 //------------------------------------------------------------------------------------------------//
-//   DOIT ESP32 Devkit V1 (URC 2025, Digit+FAERIE V2)
+//   DOIT ESP32 Devkit V1 (URC 2025, Digit V2)
 //------------------------------------------------------------------------------------------------//
 
 // Comms
@@ -31,7 +31,7 @@
 #define MOTOR_IN2 25
 #define MOTOR_FAULT 4
 
-#define LASER_NMOS 23  // same for faerie
+#define LASER_NMOS 23
 
 // ADC
 
@@ -39,7 +39,7 @@
 #define ADC_12V 36
 #define ADC_VBATT 39
 
-// FAERIE
+// SparkMax (formerly FAERIE section)
 
 #define SPARK_PWM 26
 
