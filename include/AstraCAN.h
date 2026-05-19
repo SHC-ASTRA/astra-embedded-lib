@@ -41,12 +41,9 @@ void printCANframe(CanFrame& frame);
 
 #        include <FlexCAN_T4.h>  // https://github.com/tonton81/FlexCAN_T4
 
-// Core and LANCE use CAN1, Arm uses CAN3
-#        ifdef ARM
-typedef FlexCAN_T4<CAN3, RX_SIZE_256, TX_SIZE_16> AstraCAN;
-#        else
+// NOTE: you may need to change the CAN bus number (e.g., CAN1 -> CAN3) depending on
+// which pins you are using for your CAN transceiver.
 typedef FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> AstraCAN;
-#        endif
 
 
 #    endif  // End microcontroller check
