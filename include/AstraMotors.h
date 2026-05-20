@@ -28,12 +28,11 @@ class AstraMotors {
 
 
    public:
-
     // Keep public for now for testing
     motorStatus0 status0;
     motorStatus1 status1;
     motorStatus2 status2;
-    
+
     /**
      * @brief Default constructor for a REV motor controller
      *
@@ -51,14 +50,15 @@ class AstraMotors {
      * @param SetInverted Whether or not to invert the motor's direction (used for right wheels)
      * @param SetGearBox Gearbox ratio attached to motor; e.g. for 64:1, use 64
      */
-    [[deprecated("Use AstraMotors constructor without ctrlMode parameter instead.")]]
-    AstraMotors(int setMotorID = 0, sparkMax_ctrlType setCtrlMode = sparkMax_ctrlType::kDutyCycle, bool SetInverted = false, int setGearBox = 1);
+    [[deprecated("Use AstraMotors constructor without ctrlMode parameter instead.")]] AstraMotors(
+        int setMotorID = 0, sparkMax_ctrlType setCtrlMode = sparkMax_ctrlType::kDutyCycle,
+        bool SetInverted = false, int setGearBox = 1);
 
 
     //---------------------------------------------//
     //  Getters
     //---------------------------------------------//
-    
+
     inline sparkMax_ctrlType getControlMode() const {
         return controlMode;
     }
@@ -98,8 +98,7 @@ class AstraMotors {
 
     // Whether or not the motor is currently turning to a position using the internal encoder feedback
     // (from turnByDeg() or turnToDeg())
-    [[deprecated("Functionality removed, do not use.")]]
-    inline bool isRotToPos() {
+    [[deprecated("Functionality removed, do not use.")]] inline bool isRotToPos() {
         return false;
     }
 
@@ -110,7 +109,8 @@ class AstraMotors {
 
     void setDuty(float val);  // Set the targetDutyCycle variable; will be enacted via accelerate()
 
-    void parseStatus(uint32_t apiId, uint8_t frameIn[]);  // Parse a status frame from 8-byte CAN data and REV API ID
+    void parseStatus(uint32_t apiId,
+                     uint8_t frameIn[]);  // Parse a status frame from 8-byte CAN data and REV API ID
     void parseStatus0(uint8_t frameIn[]);
     void parseStatus1(uint8_t frameIn[]);
     void parseStatus2(uint8_t frameIn[]);
@@ -129,7 +129,8 @@ class AstraMotors {
 
     // Set idle mode for the motor; either brake (true) or coast (false)
     inline void setBrake(bool enable) {
-        CAN_setParameter(motorID, sparkMax_ConfigParameter::kIdleMode, sparkMax_ParameterType::kUint32, static_cast<uint32_t>(enable));
+        CAN_setParameter(motorID, sparkMax_ConfigParameter::kIdleMode, sparkMax_ParameterType::kUint32,
+                         static_cast<uint32_t>(enable));
     }
 
     // Send the currently tracked duty cycle (currentDutyCycle) to the motor
@@ -145,9 +146,10 @@ class AstraMotors {
         //  something more robust to use the last read voltage measurement from the Sparkmax,
         //  14 V is a decent approximation of the voltage.
         static constexpr float V_BATT = 14.0;
-        CAN_sendControl(motorID, sparkMax_ctrlType::kVelocity, static_cast<float>(currentMotorSpeed) / V_BATT);
+        CAN_sendControl(motorID, sparkMax_ctrlType::kVelocity,
+                        static_cast<float>(currentMotorSpeed) / V_BATT);
     }
-    
+
     void sendDuty(float val);   // Send this duty cycle to the motor (bypasses acceleration)
     void sendSpeed(float val);  // Send this speed to the motor (bypasses acceleration)
 
@@ -157,7 +159,7 @@ class AstraMotors {
         CAN_sendControl(motorID, sparkMax_ctrlType::kCurrent, val);
     }
 
-    void accelerate();          // Run UpdateForAcceleration() and sendDuty()
+    void accelerate();  // Run UpdateForAcceleration() and sendDuty()
 
     void turnByDeg(float deg);  // Turn the motor by deg degrees
 

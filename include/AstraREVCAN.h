@@ -33,14 +33,16 @@ void CAN_enumerate();
 void CAN_sendControl(uint8_t deviceId, sparkMax_ctrlType ctrlType, float value);
 
 /**
- * @brief Sends a heartbeat frame to the specified REV ID; required for each SparkMax atleast every 25 ms (i think)
+ * @brief Sends a heartbeat frame to the specified REV ID; required for each SparkMax atleast every 25 ms (i
+ * think)
  *
  * @param deviceId REV ID
  */
 void CAN_sendHeartbeat(uint8_t deviceId);
 
 /**
- * @brief Makes the light on the specified SparkMax flash like this: https://docs.revrobotics.com/brushless/spark-max/status-led
+ * @brief Makes the light on the specified SparkMax flash like this:
+ * https://docs.revrobotics.com/brushless/spark-max/status-led
  *
  * @param deviceId REV ID
  */
@@ -48,7 +50,8 @@ void CAN_identifySparkMax(uint8_t deviceId);
 
 
 /**
- * @brief Sets a parameter on the specified SparkMax device. If incorrect type, then SparkMax will return an error
+ * @brief Sets a parameter on the specified SparkMax device. If incorrect type, then SparkMax will return an
+ * error
  *
  * @param deviceId REV ID
  * @param parameterID The parameter ID to set
@@ -90,8 +93,8 @@ void CAN_setStatusPeriod(uint8_t deviceId, sparkMax_PeriodicFrame frameId, int p
 //  Backwards Compatibility Functions  //
 //-------------------------------------//
 
-[[deprecated("Use CAN_sendHeartbeat(uint8_t deviceId) instead")]]
-inline void sendHeartbeat(TwaiCAN& Can0, int can_id) {
+[[deprecated("Use CAN_sendHeartbeat(uint8_t deviceId) instead")]] inline void sendHeartbeat(TwaiCAN& Can0,
+                                                                                            int can_id) {
     CAN_sendHeartbeat(can_id);
 }
 
@@ -102,7 +105,7 @@ inline void sendHeartbeat(TwaiCAN& Can0, int can_id) {
 
 /**
  * @brief Convert float to little endian decimal representation
- * 
+ *
  * @param[in] x Float in big endian to be converted
  * @param buffer_data 64-bit buffer corresponding to the data frame of a CAN packet
  */
@@ -114,7 +117,7 @@ void CAN_sendPacket(uint8_t deviceId, int32_t apiId, uint8_t data[], uint8_t dat
 
 /**
  * @brief Compose and send a CAN Frame using direct values; allows platform-independent code
- * 
+ *
  * @param messageID CAN Frame ID (extended, 29-bits)
  * @param data Size 8 array of bytes
  * @param dataLen CAN Frame DLC (Data length code, 0..8)

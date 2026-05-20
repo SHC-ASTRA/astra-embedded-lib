@@ -8,9 +8,8 @@
 
 double map_d(double x, double in_min, double in_max, double out_min, double out_max) {
     const double run = in_max - in_min;
-    if (run == 0)
-    {
-	    return 0;  // in_min == in_max, error
+    if (run == 0) {
+        return 0;  // in_min == in_max, error
     }
     const double rise = out_max - out_min;
     const double delta = x - in_min;
@@ -102,7 +101,7 @@ ASTRA_TIME_T Stopwatch_t::lap() {
 
 #ifdef STOPWATCH_PRINT
     STOPWATCH_SERIAL.print("Stopwatch lapped (");
-    STOPWATCH_SERIAL.print(lap_times.size()-1);
+    STOPWATCH_SERIAL.print(lap_times.size() - 1);
     STOPWATCH_SERIAL.print(") at ");
     printMicros(lap_time);
     STOPWATCH_SERIAL.println();
