@@ -30,7 +30,7 @@
     "license": "AGPL-3.0-only",
     "frameworks": "arduino",
     "dependencies": {
-        "unilib": "https://github.com/SHC-ASTRA/unilib.git#v1.0.0"
+        "unilib": "https://github.com/SHC-ASTRA/unilib.git#v2.0.0"
     },
     "build": {
         "extraScript": "extra_script.py"
