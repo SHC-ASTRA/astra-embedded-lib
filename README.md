@@ -1,97 +1,105 @@
 # astra-embedded-lib
 
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+
 Standardizing ASTRA's embedded code.
+
+This library holds the classes, functions, constants, and protocol implementations shared by
+ASTRA's microcontroller firmware, so that each submodule repo only contains what is actually
+unique to that submodule. A few examples of what lives here:
+
+* `parseInput(const String, std::vector<String>&)` — splits input from USB or UART on commas into
+  a `std::vector<String>`. The basis of every command interface on the rover.
+* `CAN_sendControl(uint8_t, sparkMax_ctrlType, float)` — sends a control command to a REV
+  SparkMax. All communication with REV motor controllers should reside in `AstraREVCAN.{h,cpp}`.
+* `isCalibrated(Adafruit_BNO055&)` — checks whether the BNO has calibration data saved in EEPROM.
+* `SERIAL_BAUD` — the USB serial baud rate used by all of ASTRA's MCUs.
 
 ## Table of Contents
 
- 1. [Overview](#overview)
+ 1. [Library contents](#library-contents)
  2. [Usage in PlatformIO](#usage-in-platformio)
- 3. [Naming conventions](#naming-conventions)
- 4. [File List](#files)
- 5. [Theory](#theory)
- 6. [Updating this Repository](#updating-this-repository)
- 7. [Responsible People](#responsible-people)
+ 3. [Adding a new header](#adding-a-new-header)
+ 4. [Versioning](#versioning)
+ 5. [Responsible People](#responsible-people)
 
-## Overview
+## Library contents
 
-This library provides classes, structs, functions, pin number macros, and
-team-wide constants, just to name a few. Here are a few examples:
+Headers live in `include/`, implementations in `src/`. Headers with no `.cpp` are header-only.
 
-* `parseInput(const String, std::vector<String>&)`: takes input from USB or UART and separates it into the vector, using commas as delimiters. Very useful for dealing with commands and data input from other mcu's.
-* `CAN_sendDutyCycle(uint8_t, AstraCAN&)`: Formats and sends a CAN packet to a REV motor controller with a duty cycle. All communication with REV motor controllers should reside in `AstraREVCAN.{h,cpp}`.
-* `isCalibrated(Adafruit_BNO055&)`: Attempts to check whether the BNO has been calibrated in EEPROM.
-* `SERIAL_BAUD`: Standard baudrate for USB Serial used by all of ASTRA's mcu's.
+| Header | Contents |
+| --- | --- |
+| `AstraCAN.h` | Selects and includes the CAN library for the target MCU; `printCANframe()`. |
+| `AstraMisc.h` | Constants, `Timer`, `Stopwatch_t`, input parsing, and build-time version info. Useful to every ASTRA project. |
+| `AstraMotors.h` | `AstraMotors` class — a single REV SparkMax, with duty cycle ramping and status frames. |
+| `AstraNP.h` | `AstraNeoPixel` class — status indicator using the onboard NeoPixel. |
+| `AstraREVCAN.h` | ASTRA's implementation of the REV SparkMax CAN protocol. |
+| `AstraREVTypes.h` | Enums and status structs for the REV SparkMax (header-only). |
+| `AstraSensors.h` | Helpers for the BNO055 IMU, BMP388 barometer, and u-blox GNSS. |
+| `AstraVicCAN.h` | VicCAN — ASTRA's inter-MCU communication standard (header-only). |
+
+Supporting files:
+
+* `library.json` — PlatformIO manifest: dependencies, license, and the build hook below.
+* `extra_script.py` — PlatformIO build hook; supplies the version info used by `AstraMisc.h`.
+* `examples/` — starting templates for a new project.
+* `.clang-format` — formatting config for ASTRA's C++ code.
 
 ## Usage in PlatformIO
 
 ### Adding to an existing PlatformIO project
 
- 1. Add the following line to `lib_deps` in your `/platformio.ini`:
+ 1. Add the library to `lib_deps` in your `platformio.ini`, pinned to a release tag:
 
-**https://github.com/SHC-ASTRA/astra-embedded-lib**
+    ```ini
+    lib_deps =
+        https://github.com/SHC-ASTRA/astra-embedded-lib#v2.0.0
+    ```
 
- 2. Add the dependencies you need from `include/`. E.g., `#include "AstraVicCAN.h"`
- 3. Make sure to grab the correct dependencies for `/platformio.ini` from the library headers.
+ 2. Include the headers you need. E.g., `#include "AstraVicCAN.h"`
+ 3. Add each header's own external dependencies to `lib_deps` as well. A header that is missing
+    one will stop the build with a message naming the exact line to add.
 
 ### Starting a new PlatformIO project
 
- 1. Copy the example file from `/.pio/libdeps/[board]/astra-Embedded-Lib/examples/Template/`
- 2. Grab whatever headers you need from `include/`
+ 1. Copy the example from `.pio/libdeps/[env]/astra-Embedded-Lib/examples/Template/`
+ 2. Include whichever headers you need from `include/`
  3. Get writing!
 
 ### Updating your libraries
 
-PlatformIO provides a button which will check for updates in all of your dependencies and update them for you. Here's how to take advantage of it:
+PlatformIO provides a button which will check for updates in all of your dependencies and update
+them for you. Here's how to take advantage of it:
 
 * Open the PlatformIO side-bar (the alien on the left)
-* Under "Project Tasks" (the top pane), for each microcontroller specified in your platformio.ini, there are a handful of folders. "General" and "Platform" should be open already.
+* Under "Project Tasks" (the top pane), for each environment specified in your `platformio.ini`,
+  there are a handful of folders. "General" and "Platform" should be open already.
 * Open the "Dependencies" folder.
 * Click "Update".
 
-## Naming conventions
+## Adding a new header
 
-### In documentation
+ 1. Put the header in `include/` and its implementation in `src/`. Header-only is fine when there
+    is nothing to compile separately.
+ 2. Name both files in camel case with every word capitalized, including the first, prefixed with
+    `Astra`. Ex: `AstraMotors.h` / `AstraMotors.cpp`
+ 3. If the header needs an external Arduino library, guard it with `__has_include` and fail with
+    an `#error` naming the exact `lib_deps` line to add — see `AstraSensors.h`. A missing
+    dependency should hand you the fix, not bury you in vague include errors.
+ 4. If the header can do something useful without that library, `#warning` and a feature macro are
+    better than an `#error`. `AstraVicCAN.h` does this: with no CAN library available it defines
+    everything anyway and runs over serial only.
+ 5. Add it to [Library contents](#library-contents) above.
 
-* **Library files** - Depending on context, either the files generally contained in the library,
-or the main functional C++ files containing functions and classes.
+Those guards are what let all of ASTRA's shared code live in one library without every project
+carrying every dependency. They only apply to headers you actually include, so a project pulls
+in exactly the external libraries it uses.
 
-### File names
+## Versioning
 
-* **Library files** - Camel case with the first letter of all words, including the first, capitalized. Ex: `AstraArm.cpp`
-
-## Files
-
-### Classes
-
-* `AstraArm.h/.cpp` - Arm
-* `AstraMotors.h/.cpp` - REV motor
-* `AstraNP.h/.cpp` - Status indicator using NeoPixel
-* `AstraVicCAN.h` - Serial/CAN-analogous communication standard
-
-### Library
-
-* `library.json` - PlatformIO stuff
-* `README.md` - this file. Documentation and GitHub front page.
-
-### Misc
-
-* `AstraREVCAN.h/.cpp` - ASTRA's implementation of CAN communication with REV motors
-* `AstraSensors.h/.cpp` - functions for sensors
-* `AstraMisc.h/.cpp` - functions, consts, etc. useful to all ASTRA projects.
-
-## Theory
-
-* `main.cpp` includes all the library headers it needs
-* Only if a library header is included by `main.cpp` will it throw `#include` errors. If the header isn't
-included in `main.cpp`, then no include errors, but if it is, then you will get required include errors.
-* `.cpp` files enable themselves when all of its required external libraries are found. External libraries
-are 90% of the reason the `.cpp` files need the option to be disabled.
-
-### Creating a new header file
-
- 1. Place the header file in `include/` and its implementation `.cpp` in `src/`.
- 2. Choose a library macro to enable its files.
- 3. Place the library macro in this file for documentation.
+Releases are git tags. Pin one in `lib_deps` (see [Usage](#adding-to-an-existing-platformio-project))
+rather than tracking the branch, so an old release of an embedded project continues to build
+after breaking changes have been released on main.
 
 ## Responsible People
 
