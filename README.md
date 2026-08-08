@@ -23,9 +23,8 @@ unique to that submodule. A few examples of what lives here:
  4. [Build-time version info](#build-time-version-info)
  5. [Adding a new header](#adding-a-new-header)
  6. [Troubleshooting](#troubleshooting)
- 7. [Versioning](#versioning)
- 8. [Header reference](#header-reference)
- 9. [Maintainers](#maintainers)
+ 7. [Header reference](#header-reference)
+ 8. [Maintainers](#maintainers)
 
 ## Library contents
 
@@ -71,6 +70,9 @@ treat it as unmaintained.
         https://github.com/SHC-ASTRA/astra-embedded-lib#v2.0.0
     ```
 
+    Releases are git tags. Pin one rather than tracking the branch, so an old release of an
+    embedded project keeps building after breaking changes land on main.
+
  2. Add a build flag naming which submodule this MCU is. Exactly one of `CORE`, `ARM`, `DIGIT`,
     `LANCE`, or `CITADEL`:
 
@@ -111,6 +113,21 @@ lib_deps =
 	fastled/FastLED@^3.6.0
 ```
 
+### Build flags
+
+These are every flag this library reads. Anything else you see in an ASTRA `platformio.ini` —
+`MAINMCU`, `TESTBED`, `FLIPSKY`, `DEBUG` — belongs to that firmware project, not this library.
+
+| Flag | Effect |
+| --- | --- |
+| `CORE` / `ARM` / `DIGIT` / `LANCE` / `CITADEL` | Sets `SUBMODULE_CAN_ID`, this MCU's VicCAN address. Effectively required; see above. |
+| `FEEDBACK_PRECISION` | Decimal places used when relaying numbers to `Serial`. Defaults to 7 for GNSS lat/lon precision. |
+| `VICCAN_DEBUG` | Prints every VicCAN frame in and out to `Serial`. Debugging only. |
+| `STOPWATCH_PRINT` | Makes `Stopwatch_t` print on every `start()`, `lap()`, and `stop()`. Off by default. |
+
+These macros can be set in `platformio.ini` with `-D` statement in `build_flags`. See the
+example from Core above.
+
 ### Developing against a local checkout
 
 When you're changing this library and a submodule's firmware together, separately cloning this
@@ -132,6 +149,23 @@ and the firmware repo are all checked out as siblings. Note that `unilib` has to
 explicitly here — the local checkout doesn't resolve the dependency from `library.json` for you.
 
 Keep the `prod` environment around so you can always flash MCUs with `main`'s code.
+
+### Flashing
+
+Uploading is the ordinary PlatformIO flow — the upload arrow in the VS Code toolbar, or
+`pio run -t upload -e core_main_prod` from a shell. You shouldn't need to press a BOOT button.
+
+Getting PlatformIO installed in the first place is the part that varies, and it's where people
+actually get stuck. On Ubuntu that means PlatformIO's own udev rules plus membership in the
+`dialout` group. Each firmware repo also ships a `flake.nix` that puts `platformio` on your path,
+so `nix develop` and the command above is a complete setup if you'd rather skip VS Code.
+
+Two things to decide deliberately before you hit upload:
+
+* **Which environment.** `prod` uses the pinned release of `astra-embedded-lib`; `dev` requires
+  and uses a local checkout.
+* **Whose code.** `main`, unless you're testing your own work or you have a feature that's finished
+  and tested but not merged yet.
 
 ### Starting a new PlatformIO project
 
@@ -275,6 +309,23 @@ if (command == "can_relay_tovic") {
 
 On a board with no CAN library available, all of the above still compiles and runs — everything
 just goes to `Serial` only.
+
+### Common serial commands
+
+Alongside VicCAN, every ASTRA MCU exposes a plain-text command interface on USB serial.
+`parseInput()` splits an incoming line on commas and the firmware dispatches on the first field.
+The Template ships the first three, so they work on any board no matter which submodule it is:
+
+| Command | Does |
+| --- | --- |
+| `ping` | Replies `pong`. Fastest way to tell whether an MCU is alive and you're at the right baud. |
+| `time` | Replies with `millis()` since boot. A good sanity check for your Serial interface. |
+| `led,on` / `led,off` / `led,toggle` | Drives `LED_BUILTIN`. Performs a physical action regardless of whether your RX is working. |
+| `can_relay_mode,on` / `can_relay_mode,off` | Relay mode — see [Serial relay](#serial-relay). |
+| `can_relay_tovic,<mcu>,<cmdId>[,data...]` | Inject a VicCAN frame — see [Serial relay](#serial-relay). |
+
+Each submodule adds its own on top: `lance` has `drill` and `linac`, `digit` has `laser` and
+`zero`. These are for debugging — read that project's `main.cpp` for more information.
 
 ### Testing CAN without CAN
 
@@ -428,12 +479,6 @@ enough to change timing. Fine while debugging, don't ship it.
 **`Raspberry Pi Pico is not supported`**
 
 Correct, it isn't. Use an ESP32.
-
-## Versioning
-
-Releases are git tags. Pin one in `lib_deps` (see [Usage](#adding-to-an-existing-platformio-project))
-rather than tracking the branch, so an old release of an embedded project continues to build
-after breaking changes have been released on main.
 
 ## Header reference
 
