@@ -19,11 +19,13 @@ unique to that submodule. A few examples of what lives here:
 
  1. [Library contents](#library-contents)
  2. [Usage in PlatformIO](#usage-in-platformio)
- 3. [Build-time version info](#build-time-version-info)
- 4. [Adding a new header](#adding-a-new-header)
- 5. [Troubleshooting](#troubleshooting)
- 6. [Versioning](#versioning)
- 7. [Responsible People](#responsible-people)
+ 3. [Using VicCAN](#using-viccan)
+ 4. [Build-time version info](#build-time-version-info)
+ 5. [Adding a new header](#adding-a-new-header)
+ 6. [Troubleshooting](#troubleshooting)
+ 7. [Versioning](#versioning)
+ 8. [Header reference](#header-reference)
+ 9. [Maintainers](#maintainers)
 
 ## Library contents
 
@@ -148,6 +150,194 @@ them for you. Here's how to take advantage of it:
 * Open the "Dependencies" folder.
 * Click "Update".
 
+## Using VicCAN
+
+VicCAN is how ASTRA's MCUs and the rover's companion computer talk to each other. Every MCU
+sits on one CAN bus, and a message consists of:
+
+* A command ID: 0-63 (6 bits)
+* An addressed MCU (e.g., Core)
+* 0-4 numbers, floating point or `int16` depending on how many.
+
+The command list is shared with ROS2 through [unilib](https://github.com/SHC-ASTRA/unilib), so
+both sides of the rover agree on what command 48 means without anyone copying a number by hand.
+(Migration in progress; this repo is fully migrated to unilib, rover-ros2 is in progress.)
+
+* Command IDs, MCU IDs, and payload types: `unilib/can_defs.hpp`
+* What each command actually does, and its arguments:
+  [the VicCAN spreadsheet](https://docs.google.com/spreadsheets/d/1jHHier_8mMmTDISywsfqXBYcWRiQC8k8O-At4GGrdkI/edit)
+
+`AstraVicCAN.h` gives you one global object, `vicCAN`. Which MCU it answers as comes from your
+submodule build flag — see [step 2 of the setup above](#adding-to-an-existing-platformio-project).
+
+### Reading commands
+
+Poll `readCan()` in `loop()`. It returns true only for frames addressed to this MCU or broadcast to
+everyone; frames for other submodules are skipped for you (or relayed; see [below](#serial-relay)).
+
+```cpp
+bool isREV;
+CanFrame rxFrame;
+
+if (vicCAN.readCan(&isREV, &rxFrame)) {
+    const uint8_t commandID = vicCAN.getCmdId();
+    std::vector<double> canData;
+    vicCAN.parseData(canData);  // Payload as 0-4 doubles, whatever it was encoded as
+
+    if (commandID == CMD_PING) {
+        vicCAN.respond(1);  // "pong" — reuses the command ID we just received
+    } else if (commandID == CMD_REV_SET_DUTY) {
+        if (canData.size() == 2) {  // Always check the size before indexing
+            leftMotor.setDuty(canData[0]);
+            rightMotor.setDuty(canData[1]);
+        }
+    }
+}
+```
+
+The arguments for `readCan()` can be optionally excluded if you don't need the functionality.
+
+`isREV` is the escape hatch for sharing the bus with REV SparkMaxes. Those use extended 29-bit IDs,
+which aren't VicCAN — when one arrives, `readCan()` returns **false**, sets `isREV` true, and leaves
+the raw frame in `rxFrame` for you to handle yourself.
+
+### Sending data
+
+The overload you get is chosen by **how many arguments you pass**, not by their type:
+
+```cpp
+vicCAN.send(CMD_GNSS_LAT, latitude);                    // 1 arg  -> one double
+vicCAN.send(CMD_GNSS_SAT, satCount, fixType);           // 2 args -> two floats
+vicCAN.send(CMD_DATA_BMP, temp, altitude, pressure);    // 3-4 args -> four int16's, truncated
+```
+
+The third line is the one you have to be conscious of: three or four arguments always means
+"four `int16_t`'s", so floats get truncated. Scale first if you need the precision, keeping in
+mind the limits for `int16`: [-32,768, 32,767]; for example, Core sends voltages as
+`vBatt * 100`; rover-ros2 divides on receive.
+
+`respond()` takes the same arguments as `send()` but reuses the command ID of the frame you just
+read, which is what you want for anything request/response.
+
+### Serial relay
+
+An MCU can bridge the CAN bus to its USB serial port; this allows the rover's companion computer
+to effectively join the CAN bus without a discrete USB-CAN converter, and is also very useful
+for debugging. The serial relay works regardless of what computer is plugged into which MCU;
+for example, you can plug your laptop into Digit (on the end of arm), and simultaneously send
+control commands to Core and read feedback from every MCU.
+
+`vicCAN.send()` will always send a message to the CAN bus, and a message directed at one MCU
+will never be acted upon by another. A control message sent over Serial to a MCU it wasn't directed
+to will always be silently and automatically relayed to the CAN network. Relay mode changes two
+things. First, the MCU echoes its own outgoing feedback to Serial as well as putting it on the bus.
+Second, when it sees a message on the CAN bus addressed to a different MCU, it relays that message
+to Serial rather than dropping it — which is what lets one USB connection read the whole bus.
+
+One note: broadcast frames on the CAN bus are never relayed to Serial; they will be acted upon
+by the MCU instead, and can be seen with `vicCAN.printFrame(&Serial)`.
+
+The syntax for the Serial-side of relay mode is simple:
+`can_relay_<to/from>vic,<mcu>,<cmdId>[,data...]`. For example:
+
+* `can_relay_tovic,core,19,0.4,0.4` - commands Core to drive forward at 40% duty cycle.
+* `can_relay_fromvic,core,48,34.7227120` - feedback from Core with Optics's GNSS latitude.
+
+To interact with/control relay mode, use the following functions:
+
+* `vicCAN.relayOn()` / `vicCAN.relayOff()` — enable or disable relay mode. These are exposed
+  to Serial as so, and can be used by a computer to identify the plugged in MCU: 
+  * `can_relay_mode,on` - enables relay mode. The MCU will respond with `can_relay_ready,<name>`.
+  * `can_relay_mode,off` - disables relay mode. The MCU will respond with `can_relay_off,<name>`.
+
+  That handshake is how `rover-ros2` identifies the rover's MCUs. Its `anchor` node writes
+  `can_relay_mode,on` to each USB device and expects `can_relay_ready,<name>` back — that exact
+  format, with `<name>` being whatever `mcuIdToString()` returns, which is your `-D` build flag in
+  lower case. Change either side and MCU discovery breaks. A new board also won't be probed at al
+  until its USB VID/PID is added to `anchor`'s known device list.
+
+* `vicCAN.relayFromSerial(args)` — hand it a `can_relay_tovic,<mcu>,<cmdId>[,data...]` line that's
+  already been through `parseInput()`. If the frame is for this MCU it gets queued for the next
+  `readCan()`; otherwise it gets directly relayed onto the CAN bus.
+
+Wire both up in your serial command handling, the way `core` does:
+
+```cpp
+if (command == "can_relay_tovic") {
+    vicCAN.relayFromSerial(args);
+} else if (command == "can_relay_mode" && args.size() == 2) {
+    if (args[1] == "on")
+        vicCAN.relayOn();
+    else if (args[1] == "off")
+        vicCAN.relayOff();
+}
+```
+
+On a board with no CAN library available, all of the above still compiles and runs — everything
+just goes to `Serial` only.
+
+### Testing CAN without CAN
+
+The relay is plain text over USB serial, so you can exercise a VicCAN handler with nothing but a
+serial terminal — no ROS2, no CAN bus, no second MCU.
+
+```text
+can_relay_mode,on                # replies: can_relay_ready,core
+can_relay_tovic,core,1           # CMD_PING -> can_relay_fromvic,core,1,1.0000000
+can_relay_tovic,core,19,0,0      # drive at 0% duty; turn the numbers up to physically drive
+```
+
+Addressed to the MCU you're plugged into, the frame gets queued and handled locally. Addressed to
+anything else, it goes out on the bus — so one USB cable reaches every submodule.
+
+Whichever terminal you use, it has to send a newline at the end of each line. The MCU reads up to
+`\n` and will sit there waiting if your terminal only sends a carriage return.
+
+* **VS Code "Serial Monitor" extension** — easiest if you're already in VS Code. Does not work if
+  VS Code was installed as a Flatpak.
+* **tio** — `tio /dev/ttyACM0`. Exit with `Ctrl-T` then `q`.
+* **GNU Screen** — `screen /dev/ttyACM0 115200`. Exit with `Ctrl-A` then `k`, `y` to confirm.
+* **PlatformIO's monitor** — `pio device monitor -e core_main_dev`. Picks up the `monitor_*`
+  settings from your environment, which is the one thing it has going for it.
+
+For the other side of the link, [rover-ros2](https://github.com/SHC-ASTRA/rover-ros2) has the
+mirror-image tooling: a `socat` pty pair that fakes a serial MCU and a virtual `vcan0` interface.
+See its README for more information.
+
+### Safety Timeouts
+
+VicCAN solves exactly one problem: message passing. Failsafes sit deliberately outside that scope;
+they live in each MCU's own code, next to the hardware they protect, because that's the only code
+still running when things go wrong. The NUC can hard crash on a power failure and a USB or CAN
+cable can come out mid-command; the MCU on the far end has to know what to do on its own. Every
+ASTRA MCU that moves something is written that way, so a command that has been received is never
+in effect indefinitely.
+
+The pattern `core` uses:
+
+```cpp
+// Stop the motors if no host control command has been received within this many ms.
+#define HOST_CMD_TIMEOUT_MS 500
+
+unsigned long lastCtrlCmd = 0;
+
+// ...in every command handler that causes motion:
+lastCtrlCmd = millis();
+
+// ...on a timer in loop(), next to accelerate():
+if (millis() - lastCtrlCmd > HOST_CMD_TIMEOUT_MS) {
+    Stop();
+}
+```
+
+Pick the timeout to suit what you're driving — 500 ms is core's number for a drive base, not a
+library constant (yet).
+
+This is separate from the SparkMax heartbeat, which covers a different link.
+`CAN_sendHeartbeat(deviceId)` satisfies each REV controller's own failsafe — roughly every 25 ms,
+and `core` cycles IDs 1–4 from a second task every 5 ms. That one protects MCU-to-motor; the
+timeout above protects basestation-to-MCU.
+
 ## Build-time version info
 
 `extra_script.py` runs on every build (PlatformIO picks it up from `library.json`) and injects git
@@ -245,16 +435,90 @@ Releases are git tags. Pin one in `lib_deps` (see [Usage](#adding-to-an-existing
 rather than tracking the branch, so an old release of an embedded project continues to build
 after breaking changes have been released on main.
 
-## Responsible People
+## Header reference
 
-### Author
+The most-used symbols from each header. Everything is documented in place — open the header for
+full signatures and the reasoning behind anything surprising.
 
-Name: David Sharpe
+### `AstraMisc.h`
 
-Email: <ds0196@uah.edu>
+* `SERIAL_BAUD`, `COMMS_UART_BAUD`, `LSS_BAUD`, `CMD_DELIM` — team-wide comms constants. Use these
+  instead of writing `115200` anywhere.
+* `parseInput(input, args)` — splits a `String` on `CMD_DELIM` (commas) into a `std::vector<String>`.
+* `checkArgs(args, numArgs)` — true if the right number of arguments came in. Guard your command
+  handlers with it before indexing `args`.
+* `Timer` — `lastMillis` / `interval` / `state` in one struct, for the `millis()` polling pattern.
+* `Stopwatch_t` — `start()`, `lap()`, `stop()` in microseconds, as a convenient tool for timing
+  evaluation.
+* `map_d(x, in_min, in_max, out_min, out_max)` — `map()` in doubles; returns 0 rather than dividing
+  by zero on an empty input range.
+* `convertADC(reading, r1, r2)` — ADC counts to volts through a divider, resistances in kΩ.
+* `SEND_VERSION_INFO`, `BUILD_TIMESTAMP` — see [Build-time version info](#build-time-version-info).
 
-### Maintainer
+### `AstraVicCAN.h`
 
-Name: David Sharpe
+See [Using VicCAN](#using-viccan). The header also exposes `VicCanFrame` if you need to build or
+inspect frames directly, and `FEEDBACK_PRECISION` (decimal places used when relaying to `Serial`,
+default 7) is overridable with a build flag.
 
-Email: <ds0196@uah.edu>
+### `AstraCAN.h`
+
+* Includes the right CAN library for the target and gives you the bus object — `ESP32Can` on ESP32.
+* `printCANframe(frame)` — dump a raw frame to `Serial` for debugging.
+
+### `AstraREVCAN.h`
+
+* `CAN_sendControl(deviceId, ctrlType, value)` — the main one. Duty cycle, velocity, position, etc.,
+  per `sparkMax_ctrlType`.
+* `CAN_sendHeartbeat(deviceId)` — SparkMaxes cut output without a regular heartbeat (~25 ms). If
+  your motors twitch and stop, this may be why. This frequency needs to be called from a thread
+  seperate from `loop()`.
+* `CAN_enumerate()` — broadcast that every SparkMax answers, staggered by its ID. Use it to find out
+  what's actually on the bus.
+* `CAN_identifySparkMax(deviceId)` — blinks one controller's LED, for working out which is which
+  and testing connectivity.
+* `CAN_setParameter()` / `CAN_reqParameter()` / `CAN_setStatusPeriod()` — configuration and status
+  frame rates.
+* `printREVFrame(frame)` / `printREVParameter(rxFrame)` — decode REV traffic to `Serial`, for
+  debugging.
+
+### `AstraREVTypes.h`
+
+Enums matching REV's protocol: `sparkMax_ctrlType`, `sparkMax_IdleMode` (brake/coast),
+`sparkMax_faultID`, `sparkMax_ConfigParameter`, `sparkMax_PeriodicFrame`, plus the `motorStatus0/1/2`
+structs that status frames decode into.
+
+### `AstraMotors.h`
+
+One `AstraMotors` per physical motor, constructed with its REV ID, control mode, inversion
+(currently no-op), and gearbox ratio.
+
+* `setDuty(val)` then `accelerate()` — ramps toward the target instead of stepping to it. Call
+  `accelerate()` on a fast timer.
+* `sendDuty(val)` — sends immediately, skipping the ramp.
+* `setBrake(enable)`, `identify()`, `setSlowStatusPeriods()`
+* `parseStatus(apiId, frameIn)` — feed it REV status frames; results land in the public
+  `status0` / `status1` / `status2` members.
+
+### `AstraNP.h`
+
+* `AstraNeoPixel(pin)` — usually `PIN_NEOPIXEL`.
+* `addStatus(status, duration)` — queue a status to display; holds up to 5.
+* `update()` — controls the physical Neopixel; run it on a timer at least 20 Hz.
+* `writeColor(color)` — drive the Neopixel directly, for showing progress during `setup()`.
+* `STATUS_IDLE`, `STATUS_BMP_NOCONN`, `STATUS_BNO_NOCONN`, `STATUS_GPS_NOCONN`, `STATUS_GPS_NOLOCK`,
+  `STATUS_CAN_NOCONN` — pre-made two-color blink patterns.
+
+### `AstraSensors.h`
+
+* `pullBNOData(bno, bno_data[7])`, `getBNOOrient(bno)` — IMU readings and heading.
+* `displayCalStatus(bno)`, `displaySensorStatus(bno)`, `displaySensorDetails(bno)`,
+  `displaySensorOffsets(offsets)` — diagnostics to `Serial`.
+* `initializeBMP(bmp)`, `pullBMPData(bmp, bmp_data[3])` — temperature, altitude, pressure.
+* `getPosition(gnss, gps_data[3 or 4])`, `getUTC(gnss)` — GNSS fix and time.
+
+## Maintainers
+
+| Name | Email | Discord |
+| ---- | ----- | ------- |
+| David Sharpe | <ds0196@uah.edu> | `@ddavdd` |
