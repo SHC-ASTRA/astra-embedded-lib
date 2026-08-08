@@ -19,12 +19,25 @@ unique to that submodule. A few examples of what lives here:
 
  1. [Library contents](#library-contents)
  2. [Usage in PlatformIO](#usage-in-platformio)
+     * [Adding to an existing PlatformIO project](#adding-to-an-existing-platformio-project)
+     * [Starting a new PlatformIO project](#starting-a-new-platformio-project)
+     * [Build flags](#build-flags)
+     * [Developing against a local checkout](#developing-against-a-local-checkout)
+     * [Flashing](#flashing)
+     * [Updating your libraries](#updating-your-libraries)
  3. [Using VicCAN](#using-viccan)
- 4. [Build-time version info](#build-time-version-info)
- 5. [Adding a new header](#adding-a-new-header)
+     * [Reading commands](#reading-commands)
+     * [Sending data](#sending-data)
+     * [Serial relay](#serial-relay)
+     * [Safety timeouts](#safety-timeouts)
+ 4. [Talking to an MCU over serial](#talking-to-an-mcu-over-serial)
+     * [Common serial commands](#common-serial-commands)
+     * [Testing CAN without CAN](#testing-can-without-can)
+ 5. [Build-time version info](#build-time-version-info)
  6. [Troubleshooting](#troubleshooting)
- 7. [Header reference](#header-reference)
- 8. [Maintainers](#maintainers)
+ 7. [Adding a new header](#adding-a-new-header)
+ 8. [Header reference](#header-reference)
+ 9. [Maintainers](#maintainers)
 
 ## Library contents
 
@@ -38,7 +51,7 @@ Headers live in `include/`, implementations in `src/`. Headers with no `.cpp` ar
 | `AstraNP.h` | `AstraNeoPixel` class — status indicator using the onboard NeoPixel. | — |
 | `AstraREVCAN.h` | ASTRA's implementation of the REV SparkMax CAN protocol. | `handmade0octopus/ESP32-TWAI-CAN` |
 | `AstraREVTypes.h` | Enums and status structs for the REV SparkMax (header-only). | — |
-| `AstraSensors.h` | Helpers for the BNO055 IMU, BMP388 barometer, and u-blox GNSS. | `adafruit/Adafruit BNO055`, `adafruit/Adafruit Unified Sensor`, `adafruit/Adafruit BMP3XX Library`, `sparkfun/SparkFun u-blox GNSS Arduino Library` |
+| `AstraSensors.h` | Helpers for the BNO055 IMU, BMP388 barometer, and u-blox GNSS. | 4 Adafruit and SparkFun libraries |
 | `AstraVicCAN.h` | VicCAN — ASTRA's inter-MCU communication standard (header-only). | `handmade0octopus/ESP32-TWAI-CAN`, optional |
 
 [unilib](https://github.com/SHC-ASTRA/unilib) — where the VicCAN command IDs, MCU IDs, and data types
@@ -53,8 +66,6 @@ Supporting files:
 * `.clang-format` — formatting config for ASTRA's C++ code.
 
 ## Usage in PlatformIO
-
-### Target hardware
 
 Everything here targets **ESP32** under the Arduino framework — currently the Adafruit Feather
 ESP32 V2, ESP32 DOIT Devkit V1, and the ESP32-S3 DevKitC. `AstraCAN.h` also carries a
@@ -113,6 +124,12 @@ lib_deps =
 	fastled/FastLED@^3.6.0
 ```
 
+### Starting a new PlatformIO project
+
+ 1. Copy the example from `.pio/libdeps/[env]/astra-Embedded-Lib/examples/Template/`
+ 2. Include whichever headers you need from `include/`
+ 3. Get writing!
+
 ### Build flags
 
 These are every flag this library reads. Anything else you see in an ASTRA `platformio.ini` —
@@ -125,7 +142,7 @@ These are every flag this library reads. Anything else you see in an ASTRA `plat
 | `VICCAN_DEBUG` | Prints every VicCAN frame in and out to `Serial`. Debugging only. |
 | `STOPWATCH_PRINT` | Makes `Stopwatch_t` print on every `start()`, `lap()`, and `stop()`. Off by default. |
 
-These macros can be set in `platformio.ini` with `-D` statement in `build_flags`. See the
+These macros can be set in `platformio.ini` with a `-D` statement in `build_flags`. See the
 example from Core above.
 
 ### Developing against a local checkout
@@ -166,12 +183,6 @@ Two things to decide deliberately before you hit upload:
   and uses a local checkout.
 * **Whose code.** `main`, unless you're testing your own work or you have a feature that's finished
   and tested but not merged yet.
-
-### Starting a new PlatformIO project
-
- 1. Copy the example from `.pio/libdeps/[env]/astra-Embedded-Lib/examples/Template/`
- 2. Include whichever headers you need from `include/`
- 3. Get writing!
 
 ### Updating your libraries
 
@@ -310,11 +321,51 @@ if (command == "can_relay_tovic") {
 On a board with no CAN library available, all of the above still compiles and runs — everything
 just goes to `Serial` only.
 
+### Safety timeouts
+
+VicCAN solves exactly one problem: message passing. Failsafes sit deliberately outside that scope;
+they live in each MCU's own code, next to the hardware they protect, because that's the only code
+still running when things go wrong. The NUC can hard crash on a power failure and a USB or CAN
+cable can come out mid-command; the MCU on the far end has to know what to do on its own. Every
+ASTRA MCU that moves something is written that way, so a command that has been received is never
+in effect indefinitely.
+
+The pattern `core` uses:
+
+```cpp
+// Stop the motors if no host control command has been received within this many ms.
+#define HOST_CMD_TIMEOUT_MS 500
+
+unsigned long lastCtrlCmd = 0;
+
+// ...in every command handler that causes motion:
+lastCtrlCmd = millis();
+
+// ...on a timer in loop(), next to accelerate():
+if (millis() - lastCtrlCmd > HOST_CMD_TIMEOUT_MS) {
+    Stop();
+}
+```
+
+Pick the timeout to suit what you're driving — 500 ms is core's number for a drive base, not a
+library constant (yet).
+
+This is separate from the SparkMax heartbeat, which covers a different link.
+`CAN_sendHeartbeat(deviceId)` satisfies each REV controller's own failsafe — roughly every 25 ms,
+and `core` cycles IDs 1–4 from a second task every 5 ms. That one protects MCU-to-motor; the
+timeout above protects basestation-to-MCU.
+
+## Talking to an MCU over serial
+
+Alongside VicCAN, every ASTRA MCU exposes a plain-text command interface on USB serial for
+debugging. It's an easy way to check if a board is alive or test specific features with
+functionality not meant for competition code.
+
 ### Common serial commands
 
-Alongside VicCAN, every ASTRA MCU exposes a plain-text command interface on USB serial.
-`parseInput()` splits an incoming line on commas and the firmware dispatches on the first field.
-The Template ships the first three, so they work on any board no matter which submodule it is:
+Command handling uses `parseInput()` to split an incoming Serial string on commas and the
+first token acts as the main command determiner. The Template ships the first three commands,
+so they work on any board no matter which submodule it is:
 
 | Command | Does |
 | --- | --- |
@@ -355,40 +406,6 @@ For the other side of the link, [rover-ros2](https://github.com/SHC-ASTRA/rover-
 mirror-image tooling: a `socat` pty pair that fakes a serial MCU and a virtual `vcan0` interface.
 See its README for more information.
 
-### Safety Timeouts
-
-VicCAN solves exactly one problem: message passing. Failsafes sit deliberately outside that scope;
-they live in each MCU's own code, next to the hardware they protect, because that's the only code
-still running when things go wrong. The NUC can hard crash on a power failure and a USB or CAN
-cable can come out mid-command; the MCU on the far end has to know what to do on its own. Every
-ASTRA MCU that moves something is written that way, so a command that has been received is never
-in effect indefinitely.
-
-The pattern `core` uses:
-
-```cpp
-// Stop the motors if no host control command has been received within this many ms.
-#define HOST_CMD_TIMEOUT_MS 500
-
-unsigned long lastCtrlCmd = 0;
-
-// ...in every command handler that causes motion:
-lastCtrlCmd = millis();
-
-// ...on a timer in loop(), next to accelerate():
-if (millis() - lastCtrlCmd > HOST_CMD_TIMEOUT_MS) {
-    Stop();
-}
-```
-
-Pick the timeout to suit what you're driving — 500 ms is core's number for a drive base, not a
-library constant (yet).
-
-This is separate from the SparkMax heartbeat, which covers a different link.
-`CAN_sendHeartbeat(deviceId)` satisfies each REV controller's own failsafe — roughly every 25 ms,
-and `core` cycles IDs 1–4 from a second task every 5 ms. That one protects MCU-to-motor; the
-timeout above protects basestation-to-MCU.
-
 ## Build-time version info
 
 `extra_script.py` runs on every build (PlatformIO picks it up from `library.json`) and injects git
@@ -419,24 +436,6 @@ with the build timestamp and a bitfield of the four main/dirty flags. Call it on
 `-embedded-lib`; the firmware projects must contain `-embedded` or start with `rover-`. Clone into
 a differently-named directory and the build still succeeds, but every version field silently
 becomes zero — see [Troubleshooting](#troubleshooting).
-
-## Adding a new header
-
- 1. Put the header in `include/` and its implementation in `src/`. Header-only is fine when there
-    is nothing to compile separately.
- 2. Name both files in camel case with every word capitalized, including the first, prefixed with
-    `Astra`. Ex: `AstraMotors.h` / `AstraMotors.cpp`
- 3. If the header needs an external Arduino library, guard it with `__has_include` and fail with
-    an `#error` naming the exact `lib_deps` line to add — see `AstraSensors.h`. A missing
-    dependency should hand you the fix, not bury you in vague include errors.
- 4. If the header can do something useful without that library, `#warning` and a feature macro are
-    better than an `#error`. `AstraVicCAN.h` does this: with no CAN library available it defines
-    everything anyway and runs over serial only.
- 5. Add it to [Library contents](#library-contents) above.
-
-Those guards are what let all of ASTRA's shared code live in one library without every project
-carrying every dependency. They only apply to headers you actually include, so a project pulls
-in exactly the external libraries it uses.
 
 ## Troubleshooting
 
@@ -479,6 +478,24 @@ enough to change timing. Fine while debugging, don't ship it.
 **`Raspberry Pi Pico is not supported`**
 
 Correct, it isn't. Use an ESP32.
+
+## Adding a new header
+
+ 1. Put the header in `include/` and its implementation in `src/`. Header-only is fine when there
+    is nothing to compile separately.
+ 2. Name both files in camel case with every word capitalized, including the first, prefixed with
+    `Astra`. Ex: `AstraMotors.h` / `AstraMotors.cpp`
+ 3. If the header needs an external Arduino library, guard it with `__has_include` and fail with
+    an `#error` naming the exact `lib_deps` line to add — see `AstraSensors.h`. A missing
+    dependency should hand you the fix, not bury you in vague include errors.
+ 4. If the header can do something useful without that library, `#warning` and a feature macro are
+    better than an `#error`. `AstraVicCAN.h` does this: with no CAN library available it defines
+    everything anyway and runs over serial only.
+ 5. Add it to [Library contents](#library-contents) above.
+
+Those guards are what let all of ASTRA's shared code live in one library without every project
+carrying every dependency. They only apply to headers you actually include, so a project pulls
+in exactly the external libraries it uses.
 
 ## Header reference
 
