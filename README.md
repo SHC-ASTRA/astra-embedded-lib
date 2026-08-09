@@ -18,26 +18,28 @@ unique to that submodule. A few examples of what lives here:
 ## Table of Contents
 
  1. [Library contents](#library-contents)
- 2. [Usage in PlatformIO](#usage-in-platformio)
+ 2. [The rover's MCUs](#the-rovers-mcus)
+ 3. [Usage in PlatformIO](#usage-in-platformio)
      * [Adding to an existing PlatformIO project](#adding-to-an-existing-platformio-project)
      * [Starting a new PlatformIO project](#starting-a-new-platformio-project)
      * [Build flags](#build-flags)
      * [Developing against a local checkout](#developing-against-a-local-checkout)
      * [Flashing](#flashing)
      * [Updating your libraries](#updating-your-libraries)
- 3. [Using VicCAN](#using-viccan)
+ 4. [Using VicCAN](#using-viccan)
+     * [Bringing up the bus](#bringing-up-the-bus)
      * [Reading commands](#reading-commands)
      * [Sending data](#sending-data)
      * [Serial relay](#serial-relay)
      * [Safety timeouts](#safety-timeouts)
- 4. [Talking to an MCU over serial](#talking-to-an-mcu-over-serial)
+ 5. [Talking to an MCU over serial](#talking-to-an-mcu-over-serial)
      * [Common serial commands](#common-serial-commands)
      * [Testing CAN without CAN](#testing-can-without-can)
- 5. [Build-time version info](#build-time-version-info)
- 6. [Troubleshooting](#troubleshooting)
- 7. [Adding a new header](#adding-a-new-header)
- 8. [Header reference](#header-reference)
- 9. [Maintainers](#maintainers)
+ 6. [Build-time version info](#build-time-version-info)
+ 7. [Troubleshooting](#troubleshooting)
+ 8. [Adding a new header](#adding-a-new-header)
+ 9. [Header reference](#header-reference)
+10. [Maintainers](#maintainers)
 
 ## Library contents
 
@@ -64,6 +66,28 @@ Supporting files:
 * `extra_script.py` — PlatformIO build hook; supplies the version info used by `AstraMisc.h`.
 * `examples/` — starting templates for a new project.
 * `.clang-format` — formatting config for ASTRA's C++ code.
+
+## The rover's MCUs
+
+Each submodule on the rover contains one or more PCBs (like how Arm contains Socket and Digit);
+each submodule gets its own repository, each PCB its own MCU, and each MCU its own PlatformIO
+project as a subfolder in its submodule's repository. The build flag you set names
+the MCU, and that name is also its address on the VicCAN bus:
+
+| Build flag | What it does | PlatformIO project | Submodule repo |
+| --- | --- | --- | --- |
+| `CORE` | Navigation and drive | `core_main/` | [core-embedded](https://github.com/SHC-ASTRA/core-embedded) |
+| `ARM` | Main arm joints | `socket_main/` | [arm-embedded](https://github.com/SHC-ASTRA/arm-embedded) |
+| `DIGIT` | Arm's end-effector | `digit_main/` | [arm-embedded](https://github.com/SHC-ASTRA/arm-embedded) |
+| `LANCE` | Science drill | `lance-embedded/` | [biosensor-embedded](https://github.com/SHC-ASTRA/biosensor-embedded) |
+| `CITADEL` | Science chemical testing | `citadel-embedded/` | [biosensor-embedded](https://github.com/SHC-ASTRA/biosensor-embedded) |
+
+The names and IDs are defined in [unilib](https://github.com/SHC-ASTRA/unilib)'s `can_defs.hpp`,
+shared with ROS2; that file is the source of truth if this table and it ever disagree.
+
+The companion computer side lives in [rover-ros2](https://github.com/SHC-ASTRA/rover-ros2).
+Its `connector.py` reaches the MCUs either through [an MCU's serial relay](#serial-relay) or by
+joining the CAN bus directly via a USB-CAN adapter.
 
 ## Usage in PlatformIO
 
@@ -126,9 +150,22 @@ lib_deps =
 
 ### Starting a new PlatformIO project
 
- 1. Copy the example from `.pio/libdeps/[env]/astra-Embedded-Lib/examples/Template/`
- 2. Include whichever headers you need from `include/`
- 3. Get writing!
+Both files you need are in
+[`examples/Template/`](https://github.com/SHC-ASTRA/astra-embedded-lib/tree/main/examples/Template)
+— grab them from GitHub, since the local copy at
+`.pio/libdeps/[env]/astra-Embedded-Lib/examples/Template/` doesn't exist until you've built once.
+
+ 1. Make the project directory and drop in `platformio.ini` and `Template.cpp` (rename it to
+    `src/main.cpp`). If you'd rather start from PlatformIO's own skeleton, `pio project init
+    --board adafruit_feather_esp32_v2` does that, then overwrite its `platformio.ini`.
+ 2. Edit the four marked lines in `platformio.ini`: the env name, `board`, your submodule build
+    flag, and whichever `lib_deps` you don't need. The comments in the file say what each one does.
+ 3. Build once — `pio run` — to confirm the dependencies resolve before you write any code.
+ 4. Include whichever headers you need from `include/`.
+ 5. Get writing!
+
+The Template already handles `ping`, `time`, and `led` over serial, so a fresh board is testable
+the moment it's flashed. See [Common serial commands](#common-serial-commands).
 
 ### Build flags
 
@@ -173,9 +210,14 @@ Uploading is the ordinary PlatformIO flow — the upload arrow in the VS Code to
 `pio run -t upload -e core_main_prod` from a shell. You shouldn't need to press a BOOT button.
 
 Getting PlatformIO installed in the first place is the part that varies, and it's where people
-actually get stuck. On Ubuntu that means PlatformIO's own udev rules plus membership in the
-`dialout` group. Each firmware repo also ships a `flake.nix` that puts `platformio` on your path,
-so `nix develop` and the command above is a complete setup if you'd rather skip VS Code.
+actually get stuck. Pick one of these:
+
+* **VS Code + the PlatformIO IDE extension.** Install it from the marketplace and it brings its own
+  toolchain along. Easiest if you're already working in VS Code.
+* **Nix.** Every firmware repo ships a `flake.nix` with `platformio` in it, so `nix develop` in the
+  repo root drops you in a shell with everything on your path — no VS Code involved. `.envrc` also
+  hooks into direnv if you have it setup. Each shell prints its own upload commands on entry,
+  e.g. `pio run -d core_main -e core_main_prod -t upload`.
 
 Two things to decide deliberately before you hit upload:
 
@@ -214,6 +256,26 @@ both sides of the rover agree on what command 48 means without anyone copying a 
 
 `AstraVicCAN.h` gives you one global object, `vicCAN`. Which MCU it answers as comes from your
 submodule build flag — see [step 2 of the setup above](#adding-to-an-existing-platformio-project).
+
+### Bringing up the bus
+
+**This library never starts the CAN peripheral — your code does.**  One line in `setup()`, after `Serial.begin()`:
+
+```cpp
+if (ESP32Can.begin(TWAI_SPEED_1000KBPS, CAN_TX, CAN_RX))
+    Serial.println("CAN bus started!");
+else
+    Serial.println("CAN bus failed!");
+```
+
+`ESP32Can` comes from `AstraVicCAN.h` — it includes `AstraCAN.h` for you when a CAN library is
+available, so there's nothing extra to include.
+
+* **`TWAI_SPEED_1000KBPS` is required.** 1 Mbit/s is the rate every ASTRA MCU and REV Sparkmax
+  runs, and CAN gives you nothing if the two ends disagree.
+* **`CAN_TX` / `CAN_RX` are yours to define**, not the library's. Use the ones for your PCB, and
+  double-check it; swapping these or using the wrong pins entire is an easy, common issue.
+  Transceiver (TJA1051T/3) and MCU pins do not swap like UART; TX -> TX, RX -> RX.
 
 ### Reading commands
 
@@ -298,7 +360,7 @@ To interact with/control relay mode, use the following functions:
   That handshake is how `rover-ros2` identifies the rover's MCUs. Its `anchor` node writes
   `can_relay_mode,on` to each USB device and expects `can_relay_ready,<name>` back — that exact
   format, with `<name>` being whatever `mcuIdToString()` returns, which is your `-D` build flag in
-  lower case. Change either side and MCU discovery breaks. A new board also won't be probed at al
+  lower case. Change either side and MCU discovery breaks. A new board also won't be probed at all
   until its USB VID/PID is added to `anchor`'s known device list.
 
 * `vicCAN.relayFromSerial(args)` — hand it a `can_relay_tovic,<mcu>,<cmdId>[,data...]` line that's
@@ -534,7 +596,7 @@ default 7) is overridable with a build flag.
   per `sparkMax_ctrlType`.
 * `CAN_sendHeartbeat(deviceId)` — SparkMaxes cut output without a regular heartbeat (~25 ms). If
   your motors twitch and stop, this may be why. This frequency needs to be called from a thread
-  seperate from `loop()`.
+  separate from `loop()`.
 * `CAN_enumerate()` — broadcast that every SparkMax answers, staggered by its ID. Use it to find out
   what's actually on the bus.
 * `CAN_identifySparkMax(deviceId)` — blinks one controller's LED, for working out which is which
@@ -552,8 +614,11 @@ structs that status frames decode into.
 
 ### `AstraMotors.h`
 
-One `AstraMotors` per physical motor, constructed with its REV ID, control mode, inversion
-(currently no-op), and gearbox ratio.
+One `AstraMotors` per physical motor: `AstraMotors(revId, inverted, gearBox)` — REV ID, inversion
+(currently a no-op), and gearbox ratio as a plain integer (64 for 64:1).
+
+A motor starts in duty-cycle mode and switches based on which method you call — `setDuty()` and
+`sendDuty()` put it in duty-cycle mode, `sendSpeed()` in velocity, `sendCurrent()` in current.
 
 * `setDuty(val)` then `accelerate()` — ramps toward the target instead of stepping to it. Call
   `accelerate()` on a fast timer.
@@ -565,7 +630,8 @@ One `AstraMotors` per physical motor, constructed with its REV ID, control mode,
 ### `AstraNP.h`
 
 * `AstraNeoPixel(pin)` — usually `PIN_NEOPIXEL`.
-* `addStatus(status, duration)` — queue a status to display; holds up to 5.
+* `addStatus(status, duration)` — queue a status to display; holds up to 5. **`duration` is in
+  seconds**, not milliseconds.
 * `update()` — controls the physical Neopixel; run it on a timer at least 20 Hz.
 * `writeColor(color)` — drive the Neopixel directly, for showing progress during `setup()`.
 * `STATUS_IDLE`, `STATUS_BMP_NOCONN`, `STATUS_BNO_NOCONN`, `STATUS_GPS_NOCONN`, `STATUS_GPS_NOLOCK`,
@@ -577,7 +643,7 @@ One `AstraMotors` per physical motor, constructed with its REV ID, control mode,
 * `displayCalStatus(bno)`, `displaySensorStatus(bno)`, `displaySensorDetails(bno)`,
   `displaySensorOffsets(offsets)` — diagnostics to `Serial`.
 * `initializeBMP(bmp)`, `pullBMPData(bmp, bmp_data[3])` — temperature, altitude, pressure.
-* `getPosition(gnss, gps_data[3 or 4])`, `getUTC(gnss)` — GNSS fix and time.
+* `getPosition(gnss, gps_data[4])`, `getUTC(gnss)` — GNSS fix and time.
 
 ## Maintainers
 
