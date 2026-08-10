@@ -10,7 +10,6 @@
 //------------//
 
 #include "AstraMisc.h"
-#include "project/TEMPLATE.h"
 
 
 //------------//
