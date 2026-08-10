@@ -21,7 +21,6 @@ This library holds the classes, functions, constants, and protocol implementatio
     - [Build flags](#build-flags)
     - [Developing against a local checkout](#developing-against-a-local-checkout)
     - [Flashing](#flashing)
-    - [Updating your libraries](#updating-your-libraries)
 4.  [Using VicCAN](#using-viccan)
     - [Bringing up the bus](#bringing-up-the-bus)
     - [Reading commands](#reading-commands)
@@ -41,18 +40,18 @@ This library holds the classes, functions, constants, and protocol implementatio
 
 Headers live in `include/`, implementations in `src/`. Headers with no `.cpp` are header-only.
 
-| Header            | Contents                                                                                                      | Requires in `lib_deps`                      |
-| ----------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| `AstraCAN.h`      | Selects and includes the CAN library for the target MCU; `printCANframe()`.                                   | `handmade0octopus/ESP32-TWAI-CAN`           |
-| `AstraMisc.h`     | Constants, `Timer`, `Stopwatch_t`, input parsing, and build-time version info. Useful to every ASTRA project. | —                                           |
-| `AstraMotors.h`   | `AstraMotors` class — a single REV SparkMax, with duty cycle ramping and status frames.                       | `handmade0octopus/ESP32-TWAI-CAN`           |
-| `AstraNP.h`       | `AstraNeoPixel` class — status indicator using the onboard NeoPixel.                                          | —                                           |
-| `AstraREVCAN.h`   | ASTRA's implementation of the REV SparkMax CAN protocol.                                                      | `handmade0octopus/ESP32-TWAI-CAN`           |
-| `AstraREVTypes.h` | Enums and status structs for the REV SparkMax (header-only).                                                  | —                                           |
-| `AstraSensors.h`  | Helpers for the BNO055 IMU, BMP388 barometer, and u-blox GNSS.                                                | 4 Adafruit and SparkFun libraries           |
-| `AstraVicCAN.h`   | VicCAN — ASTRA's inter-MCU communication standard (header-only).                                              | `handmade0octopus/ESP32-TWAI-CAN`, optional |
+| Header                               | Contents                                                                                                      | Requires in `lib_deps`                      |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| [`AstraCAN.h`](#astracanh)           | Selects and includes the CAN library for the target MCU; `printCANframe()`.                                   | `handmade0octopus/ESP32-TWAI-CAN`           |
+| [`AstraMisc.h`](#astramisch)         | Constants, `Timer`, `Stopwatch_t`, input parsing, and build-time version info. Useful to every ASTRA project. | —                                           |
+| [`AstraMotors.h`](#astramotorsh)     | `AstraMotors` class — a single REV SparkMax, with duty cycle ramping and status frames.                       | `handmade0octopus/ESP32-TWAI-CAN`           |
+| [`AstraNP.h`](#astranph)             | `AstraNeoPixel` class — status indicator using the onboard NeoPixel.                                          | —                                           |
+| [`AstraREVCAN.h`](#astrarevcanh)     | ASTRA's implementation of the REV SparkMax CAN protocol.                                                      | `handmade0octopus/ESP32-TWAI-CAN`           |
+| [`AstraREVTypes.h`](#astrarevtypesh) | Enums and status structs for the REV SparkMax (header-only).                                                  | —                                           |
+| [`AstraSensors.h`](#astrasensorsh)   | Helpers for the BNO055 IMU, BMP388 barometer, and u-blox GNSS.                                                | 4 Adafruit and SparkFun libraries           |
+| [`AstraVicCAN.h`](#astraviccanh)     | VicCAN — ASTRA's inter-MCU communication standard (header-only).                                              | `handmade0octopus/ESP32-TWAI-CAN`, optional |
 
-[unilib](https://github.com/SHC-ASTRA/unilib) — where the VicCAN command IDs, MCU IDs, and data types are defined — is declared as a dependency in `library.json`, so PlatformIO pulls it in on its own. You only name it in `lib_deps` yourself when developing against a local checkout.
+[unilib](https://github.com/SHC-ASTRA/unilib) — the shared VicCAN definitions, see [Using VicCAN](#using-viccan) — is declared as a dependency in `library.json`, so PlatformIO pulls it in on its own. You only name it in `lib_deps` yourself when [developing against a local checkout](#developing-against-a-local-checkout).
 
 Supporting files:
 
@@ -73,7 +72,7 @@ Each submodule on the rover contains one or more PCBs (like how Arm contains Soc
 | `LANCE`    | Science drill            | `lance-embedded/`   | [biosensor-embedded](https://github.com/SHC-ASTRA/biosensor-embedded) |
 | `CITADEL`  | Science chemical testing | `citadel-embedded/` | [biosensor-embedded](https://github.com/SHC-ASTRA/biosensor-embedded) |
 
-The names and IDs are defined in [unilib](https://github.com/SHC-ASTRA/unilib)'s `can_defs.hpp`, shared with ROS2; that file is the source of truth if this table and it ever disagree.
+The names and IDs come from `unilib/can_defs.hpp`, which wins if it and this table ever disagree.
 
 The companion computer side lives in [rover-ros2](https://github.com/SHC-ASTRA/rover-ros2). Its `connector.py` reaches the MCUs either through [an MCU's serial relay](#serial-relay) or by joining the CAN bus directly via a USB-CAN adapter.
 
@@ -99,7 +98,7 @@ Everything here targets **ESP32** under the Arduino framework — currently the 
         -D CORE
     ```
 
-    This sets `SUBMODULE_CAN_ID`, which is the MCU's address on the VicCAN bus. Leave it out and the build still succeeds, but the MCU answers only to broadcast messages and identifies itself as a broadcast — so it looks alive while ignoring everything addressed to it.
+    This sets `SUBMODULE_CAN_ID`, the MCU's address on the VicCAN bus. Leave it out and the build still succeeds, but the MCU answers only to broadcast messages — see [Troubleshooting](#troubleshooting).
 
 3.  Include the headers you need. E.g., `#include "AstraVicCAN.h"`
 4.  Add each header's own external dependencies to `lib_deps` — see [Library contents](#library-contents). A header missing one will stop the build with a message naming the exact line to add.
@@ -134,8 +133,7 @@ Both files you need are in [`examples/Template/`](https://github.com/SHC-ASTRA/a
 1.  Make the project directory and drop in `platformio.ini` and `Template.cpp` (rename it to `src/main.cpp`). If you'd rather start from PlatformIO's own skeleton, `pio project init --board adafruit_feather_esp32_v2` does that, then overwrite its `platformio.ini`.
 2.  Edit the four marked lines in `platformio.ini`: the env name, `board`, your submodule build flag, and whichever `lib_deps` you don't need. The comments in the file say what each one does.
 3.  Build once — `pio run` — to confirm the dependencies resolve before you write any code.
-4.  Include whichever headers you need from `include/`.
-5.  Get writing!
+4.  Include whichever headers you need from `include/`, and get writing.
 
 The Template already handles `ping`, `time`, and `led` over serial, so a fresh board is testable the moment it's flashed. See [Common serial commands](#common-serial-commands).
 
@@ -143,12 +141,12 @@ The Template already handles `ping`, `time`, and `led` over serial, so a fresh b
 
 These are every flag this library reads. Anything else you see in an ASTRA `platformio.ini` — `MAINMCU`, `TESTBED`, `FLIPSKY`, `DEBUG` — belongs to that firmware project, not this library.
 
-| Flag                                           | Effect                                                                                           |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `CORE` / `ARM` / `DIGIT` / `LANCE` / `CITADEL` | Sets `SUBMODULE_CAN_ID`, this MCU's VicCAN address. Effectively required; see above.             |
-| `FEEDBACK_PRECISION`                           | Decimal places used when relaying numbers to `Serial`. Defaults to 7 for GNSS lat/lon precision. |
-| `VICCAN_DEBUG`                                 | Prints every VicCAN frame in and out to `Serial`. Debugging only.                                |
-| `STOPWATCH_PRINT`                              | Makes `Stopwatch_t` print on every `start()`, `lap()`, and `stop()`. Off by default.             |
+| Flag                                           | Effect                                                                                                                              |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `CORE` / `ARM` / `DIGIT` / `LANCE` / `CITADEL` | Sets `SUBMODULE_CAN_ID`, this MCU's VicCAN address. Effectively required — see [step 2](#adding-to-an-existing-platformio-project). |
+| `FEEDBACK_PRECISION`                           | Decimal places used when relaying numbers to `Serial`. Defaults to 7 for GNSS lat/lon precision.                                    |
+| `VICCAN_DEBUG`                                 | Prints every VicCAN frame in and out to `Serial`. Debugging only.                                                                   |
+| `STOPWATCH_PRINT`                              | Makes `Stopwatch_t` print on every `start()`, `lap()`, and `stop()`. Off by default.                                                |
 
 These macros can be set in `platformio.ini` with a `-D` statement in `build_flags`. See the example from Core above.
 
@@ -174,24 +172,15 @@ Keep the `prod` environment around so you can always flash MCUs with `main`'s co
 
 Uploading is the ordinary PlatformIO flow — the upload arrow in the VS Code toolbar, or `pio run -t upload -e core_main_prod` from a shell. You shouldn't need to press a BOOT button.
 
-Getting PlatformIO installed in the first place is the part that varies, and it's where people actually get stuck. Pick one of these:
+Installing PlatformIO is the part that varies. Pick one:
 
-- **VS Code + the PlatformIO IDE extension.** Install it from the marketplace and it brings its own toolchain along. Easiest if you're already working in VS Code.
+- **VS Code + the PlatformIO IDE extension.** Install it from the marketplace and it brings its own toolchain along. Easiest if you're already working in VS Code. Its sidebar (the alien icon) also updates your dependencies: **Project Tasks → _env_ → Dependencies → Update**.
 - **Nix.** Every firmware repo ships a `flake.nix` with `platformio` in it, so `nix develop` in the repo root drops you in a shell with everything on your path — no VS Code involved. `.envrc` also hooks into direnv if you have it setup. Each shell prints its own upload commands on entry, e.g. `pio run -d core_main -e core_main_prod -t upload`.
 
 Two things to decide deliberately before you hit upload:
 
 - **Which environment.** `prod` uses the pinned release of `astra-embedded-lib`; `dev` requires and uses a local checkout.
 - **Whose code.** `main`, unless you're testing your own work or you have a feature that's finished and tested but not merged yet.
-
-### Updating your libraries
-
-PlatformIO provides a button which will check for updates in all of your dependencies and update them for you. Here's how to take advantage of it:
-
-- Open the PlatformIO side-bar (the alien on the left)
-- Under "Project Tasks" (the top pane), for each environment specified in your `platformio.ini`, there are a handful of folders. "General" and "Platform" should be open already.
-- Open the "Dependencies" folder.
-- Click "Update".
 
 ## Using VicCAN
 
@@ -232,7 +221,7 @@ Poll `readCan()` in `loop()`. It returns true only for frames addressed to this 
 bool isREV;
 CanFrame rxFrame;
 
-if (vicCAN.readCan(&isREV, &rxFrame)) {
+if (vicCAN.readCan(&isREV, &rxFrame)) {  // The arguments are optional
     const uint8_t commandID = vicCAN.getCmdId();
     std::vector<double> canData;
     vicCAN.parseData(canData);  // Payload as 0-4 doubles, whatever it was encoded as
@@ -248,8 +237,6 @@ if (vicCAN.readCan(&isREV, &rxFrame)) {
 }
 ```
 
-The arguments for `readCan()` can be optionally excluded if you don't need the functionality.
-
 `isREV` is the escape hatch for sharing the bus with REV SparkMaxes. Those use extended 29-bit IDs, which aren't VicCAN — when one arrives, `readCan()` returns **false**, sets `isREV` true, and leaves the raw frame in `rxFrame` for you to handle yourself.
 
 ### Sending data
@@ -257,24 +244,35 @@ The arguments for `readCan()` can be optionally excluded if you don't need the f
 The overload you get is chosen by **how many arguments you pass**, not by their type:
 
 ```cpp
-vicCAN.send(CMD_GNSS_LAT, latitude);                    // 1 arg  -> one double
-vicCAN.send(CMD_GNSS_SAT, satCount, fixType);           // 2 args -> two floats
-vicCAN.send(CMD_DATA_BMP, temp, altitude, pressure);    // 3-4 args -> four int16's, truncated
+vicCAN.send(CMD_GNSS_LAT, latitude);                  // 1 arg   -> one double
+vicCAN.send(CMD_GNSS_SAT, satCount, fixType);         // 2 args  -> two floats
+vicCAN.send(CMD_DATA_BMP, temp, altitude, pressure);  // 3-4 args -> four int16's
 ```
 
-The third line is the one you have to be conscious of: three or four arguments always means "four `int16_t`'s", so floats get truncated. Scale first if you need the precision, keeping in mind the limits for `int16`: [-32,768, 32,767]; for example, Core sends voltages as `vBatt * 100`; rover-ros2 divides on receive.
+**Three or four arguments always means four `int16_t`'s**, so floats get truncated and anything outside [-32,768, 32,767] will overflow. Scale before sending if you need precision; for example, Core sends voltages as `vBatt * 100`, and rover-ros2 divides on receive.
 
 `respond()` takes the same arguments as `send()` but reuses the command ID of the frame you just read, which is what you want for anything request/response.
 
 ### Serial relay
 
-An MCU can bridge the CAN bus to its USB serial port; this allows the rover's companion computer to effectively join the CAN bus without a discrete USB-CAN converter, and is also very useful for debugging. The serial relay works regardless of what computer is plugged into which MCU; for example, you can plug your laptop into Digit (on the end of arm), and simultaneously send control commands to Core and read feedback from every MCU.
+An MCU can bridge the CAN bus to its USB serial port, letting the rover's companion computer or a laptop join the bus without a discrete USB-CAN converter. It works from whichever MCU you're plugged into: connect a laptop to Digit at the end of the arm and you can still drive Core and read feedback from every submodule.
 
-`vicCAN.send()` will always send a message to the CAN bus, and a message directed at one MCU will never be acted upon by another. A control message sent over Serial to a MCU it wasn't directed to will always be silently and automatically relayed to the CAN network. Relay mode changes two things. First, the MCU echoes its own outgoing feedback to Serial as well as putting it on the bus. Second, when it sees a message on the CAN bus addressed to a different MCU, it relays that message to Serial rather than dropping it — which is what lets one USB connection read the whole bus.
+**Relay mode only changes what the MCU sends over Serial, not CAN.** What it does with a frame — act on it, pass it along, ignore it — is decided by the frame's address, the same either way; relay mode only decides how much of that traffic gets echoed over Serial. _Note that only the first two rows differ between the columns:_
 
-One note: broadcast frames on the CAN bus are never relayed to Serial; they will be acted upon by the MCU instead, and can be seen with `vicCAN.printFrame(&Serial)`.
+| Direction | Traffic                               | Relay off                                          | Relay on                                           |
+| --------- | ------------------------------------- | -------------------------------------------------- | -------------------------------------------------- |
+| Outgoing  | This MCU's own `send()` / `respond()` | Onto the CAN bus                                   | Onto the CAN bus **and** echoed to Serial          |
+| CAN in    | Frame addressed to another MCU        | Dropped                                            | Forwarded to Serial as `can_relay_fromvic,...`     |
+| CAN in    | Frame for this MCU, or a broadcast    | Acted on locally; never forwarded                  | Acted on locally; never forwarded                  |
+| Serial in | `can_relay_tovic` for another MCU     | Straight onto the CAN bus                          | Straight onto the CAN bus                          |
+| Serial in | `can_relay_tovic` for this MCU        | Queued for the next `readCan()`, stays off the bus | Queued for the next `readCan()`, stays off the bus |
+| Serial in | `can_relay_tovic` broadcast           | Queued locally **and** put on the bus              | Queued locally **and** put on the bus              |
 
-The syntax for the Serial-side of relay mode is simple: `can_relay_<to/from>vic,<mcu>,<cmdId>[,data...]`. For example:
+Row 2 is the one that earns the feature: with relay on, one USB cable sees every frame on the bus, whichever MCU it happens to be plugged into. Rows 4-6 are why you can drive any submodule without touching relay mode at all — an outgoing command is routed by its address, not by the mode.
+
+Broadcasts are the one thing you can't watch from Serial; the MCU acts on them instead of forwarding them, so print them yourself with `vicCAN.printFrame(&Serial)` if you need to see them.
+
+The Serial-side syntax is `can_relay_<to/from>vic,<mcu>,<cmdId>[,data...]`; for example:
 
 - `can_relay_tovic,core,19,0.4,0.4` - commands Core to drive forward at 40% duty cycle.
 - `can_relay_fromvic,core,48,34.7227120` - feedback from Core with Optics's GNSS latitude.
@@ -285,9 +283,11 @@ To interact with/control relay mode, use the following functions:
   - `can_relay_mode,on` - enables relay mode. The MCU will respond with `can_relay_ready,<name>`.
   - `can_relay_mode,off` - disables relay mode. The MCU will respond with `can_relay_off,<name>`.
 
-  That handshake is how `rover-ros2` identifies the rover's MCUs. Its `anchor` node writes `can_relay_mode,on` to each USB device and expects `can_relay_ready,<name>` back — that exact format, with `<name>` being whatever `mcuIdToString()` returns, which is your `-D` build flag in lower case. Change either side and MCU discovery breaks. A new board also won't be probed at all until its USB VID/PID is added to `anchor`'s known device list.
+  That handshake is how `rover-ros2` identifies the rover's MCUs — its `anchor` node writes `can_relay_mode,on` to each USB device and expects `can_relay_ready,<name>` back. Two things break discovery:
+  - **Changing the format on either side.** `<name>` is whatever `mcuIdToString()` returns — your `-D` build flag in lower case.
+  - **A board `anchor` has never seen.** It isn't probed at all until its USB VID/PID is added to `anchor`'s known device list.
 
-- `vicCAN.relayFromSerial(args)` — hand it a `can_relay_tovic,<mcu>,<cmdId>[,data...]` line that's already been through `parseInput()`. If the frame is for this MCU it gets queued for the next `readCan()`; otherwise it gets directly relayed onto the CAN bus.
+- `vicCAN.relayFromSerial(args)` — hand it a `can_relay_tovic` line that's already been through `parseInput()`, and it routes the frame per the table above. Bad MCU names, out-of-range command IDs, and wrong argument counts are rejected to `Serial` rather than reaching the bus.
 
 Wire both up in your serial command handling, the way `core` does:
 
@@ -306,9 +306,7 @@ On a board with no CAN library available, all of the above still compiles and ru
 
 ### Safety timeouts
 
-VicCAN solves exactly one problem: message passing. Failsafes sit deliberately outside that scope; they live in each MCU's own code, next to the hardware they protect, because that's the only code still running when things go wrong. The NUC can hard crash on a power failure and a USB or CAN cable can come out mid-command; the MCU on the far end has to know what to do on its own. Every ASTRA MCU that moves something is written that way, so a command that has been received is never in effect indefinitely.
-
-The pattern `core` uses:
+VicCAN handles message passing and nothing else. Failsafes live in each MCU's own code, next to the hardware they protect — that's the only code still running when the NUC crashes or a cable comes out mid-command. Every ASTRA MCU that moves something needs a timeout, so a received command is never in effect indefinitely. See the pattern `core` uses:
 
 ```cpp
 // Stop the motors if no host control command has been received within this many ms.
@@ -427,7 +425,7 @@ Correct, it isn't. Use an ESP32.
 4.  If the header can do something useful without that library, `#warning` and a feature macro are better than an `#error`. `AstraVicCAN.h` does this: with no CAN library available it defines everything anyway and runs over serial only.
 5.  Add it to [Library contents](#library-contents) above.
 
-Those guards are what let all of ASTRA's shared code live in one library without every project carrying every dependency. They only apply to headers you actually include, so a project pulls in exactly the external libraries it uses.
+Those guards only apply to headers you actually include, which is what lets all of ASTRA's shared code live in one library without every project carrying every dependency.
 
 ## Header reference
 
@@ -446,7 +444,7 @@ The most-used symbols from each header. Everything is documented in place — op
 
 ### `AstraVicCAN.h`
 
-See [Using VicCAN](#using-viccan). The header also exposes `VicCanFrame` if you need to build or inspect frames directly, and `FEEDBACK_PRECISION` (decimal places used when relaying to `Serial`, default 7) is overridable with a build flag.
+See [Using VicCAN](#using-viccan). The header also exposes `VicCanFrame` if you need to build or inspect frames directly, and honors the [`FEEDBACK_PRECISION`](#build-flags) build flag.
 
 ### `AstraCAN.h`
 
