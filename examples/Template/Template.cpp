@@ -10,6 +10,7 @@
 //------------//
 
 #include "AstraMisc.h"
+#include "AstraVicCAN.h"
 
 
 //------------//
@@ -31,6 +32,8 @@
 
 uint32_t lastBlink = 0;
 bool ledState = false;
+
+uint32_t lastVersionSend = 0;
 
 
 //--------------//
@@ -111,10 +114,37 @@ void loop() {
     }
 #endif
 
+    if (millis() - lastVersionSend > 5000) {
+        lastVersionSend = millis();
+        SEND_VERSION_INFO
+    }
+
 
     //-------------//
     //  CAN Input  //
     //-------------//
+    if (vicCAN.readCan()) {
+        const uint8_t commandID = vicCAN.getCmdId();
+        std::vector<double> canData;
+        vicCAN.parseData(canData);  // Payload as 0-4 doubles, whatever it was encoded as
+
+        Serial.print("VicCAN: ");
+        vicCAN.printFrame(&Serial);
+
+        // Misc
+
+        if (commandID == CMD_PING) {
+            vicCAN.respond(1);  // "pong" — reuses the command ID we just received
+            Serial.println("Received ping over VicCAN");
+        } else if (commandID == CMD_B_LED) {
+            if (canData.size() == 1) {
+                if (canData[0] == 0)
+                    digitalWrite(LED_BUILTIN, false);
+                if (canData[0] == 1)
+                    digitalWrite(LED_BUILTIN, true);
+            }
+        }
+    }
 
 
     //------------------//
@@ -138,7 +168,7 @@ void loop() {
 
         input.trim();                   // Remove preceding and trailing whitespace
         std::vector<String> args = {};  // Initialize empty vector to hold separated arguments
-        parseInput(input, args);   // Separate `input` by commas and place into args vector
+        parseInput(input, args);        // Separate `input` by commas and place into args vector
         args[0].toLowerCase();          // Make command case-insensitive
         String command = args[0];       // To make processing code more readable
 
