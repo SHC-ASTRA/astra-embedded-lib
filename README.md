@@ -215,13 +215,12 @@ else
 
 ### Reading commands
 
-Poll `readCan()` in `loop()`. It returns true only for frames addressed to this MCU or broadcast to everyone; frames for other submodules are skipped for you (or relayed; see [below](#serial-relay)).
+Poll `readCan()` in `loop()`. It returns true only for frames addressed to this MCU or broadcast to everyone; frames for other submodules are skipped for you (and/or relayed; see [below](#serial-relay)).
 
 ```cpp
 bool isREV;
 CanFrame rxFrame;
-
-if (vicCAN.readCan(&isREV, &rxFrame)) {  // The arguments are optional
+if (vicCAN.readCan(&isREV, &rxFrame)) {  // Arguments are only applicable if using REVCAN
     const uint8_t commandID = vicCAN.getCmdId();
     std::vector<double> canData;
     vicCAN.parseData(canData);  // Payload as 0-4 doubles, whatever it was encoded as
@@ -302,7 +301,7 @@ if (command == "can_relay_tovic") {
 }
 ```
 
-On a board with no CAN library available, all of the above still compiles and runs — everything just goes to `Serial` only.
+On a board with no CAN library available (e.g., a Pico), VicCAN is still fully usable over Serial-only; its CAN functionality will just be disabled.
 
 ### Safety timeouts
 
@@ -415,14 +414,14 @@ You turned on VicCAN's debug output. Every frame in and out gets printed to `Ser
 
 **`Raspberry Pi Pico is not supported`**
 
-Correct, it isn't. Use an ESP32.
+Correct, it isn't. If you need CAN functionality, use an ESP32.
 
 ## Adding a new header
 
 1.  Put the header in `include/` and its implementation in `src/`. Header-only is fine when there is nothing to compile separately.
 2.  Name both files in camel case with every word capitalized, including the first, prefixed with `Astra`. Ex: `AstraMotors.h` / `AstraMotors.cpp`
 3.  If the header needs an external Arduino library, guard it with `__has_include` and fail with an `#error` naming the exact `lib_deps` line to add — see `AstraSensors.h`. A missing dependency should hand you the fix, not bury you in vague include errors.
-4.  If the header can do something useful without that library, `#warning` and a feature macro are better than an `#error`. `AstraVicCAN.h` does this: with no CAN library available it defines everything anyway and runs over serial only.
+4.  If the header can do something useful without that library, `#warning` and a feature macro are better than an `#error`. `AstraVicCAN.h` does this: with no CAN library available it disables its CAN functionality and uses Serial-only.
 5.  Add it to [Library contents](#library-contents) above.
 
 Those guards only apply to headers you actually include, which is what lets all of ASTRA's shared code live in one library without every project carrying every dependency.

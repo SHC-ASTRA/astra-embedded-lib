@@ -280,7 +280,9 @@ class VicCanFrame {
 #ifdef CAN_AVAILABLE
     /**
      * @brief Read the CAN network for a frame; automatically parses into the VicCanFrame object.
-     * 
+     *
+     * @param[out] rawFrame The CanFrame read by TwaiCAN, if any. Dereferences the pointer
+     * before writing to it; make sure you have memory allocated to the pointer you pass.
      * @return true if a frame is successfully read;
      * @return false if no frame is received.
      */
@@ -374,32 +376,19 @@ class VicCanController {
         return inVicCanFrame.cmdId;
     }
 
+    // TODO(david): properly private-ize this header
+   private:
     /**
-     * @brief Extends readCanFrame() to check destination of CAN Frame, relays stray CAN frames
-     * to Serial if relayMode is on, and checks for a queued frame from relayFromSerial().
+     * @brief Checks if there is a queued VicCAN frame relayed from Serial.
      *
-     * (Non-REVCAN compatible variant)
+     * If there is a queued frame waiting, this function resets the flag for the next loop
+     * iteration; therefore, if this function returns true, you must act on the queued frame or
+     * you will lose it.
      *
-     * @return true upon reading a CAN frame for this MCU;
-     * @return false upon not finding a CAN frame or only reading one for a different MCU
+     * @return true if there is a queued frame we should act on;
+     * @return false if there is no queued frame
      */
-    inline bool readCan() {
-        bool isREV;
-        CanFrame rawFrame;
-        return readCan(&isREV, &rawFrame);
-    }
-
-    /**
-     * @brief Extends readCanFrame() to check destination of CAN Frame, relays stray CAN frames
-     * to Serial if relayMode is on, and checks for a queued frame from relayFromSerial().
-     *
-     * @param isREV [out] whether the frame read is a REV CAN frame
-     * @param outFrame [out] the raw CAN frame read, for use with REV CAN frames that need to be parsed by loop()
-     *
-     * @return true upon reading a CAN frame for this MCU;
-     * @return false upon not finding a CAN frame or only reading one for a different MCU
-     */
-    bool readCan(bool* isREV, CanFrame* outFrame) {
+    bool takeQueuedSerialFrame() {
         // Check for queued frame from relayFromSerial()
         if (relayFrameWaiting) {
             relayFrameWaiting = false;
@@ -409,7 +398,21 @@ class VicCanController {
             return true;  // Use inVicCanFrame already set by relayFromSerial()
         }
 
-// #ifdef CAN_AVAILABLE
+        return false;
+    }
+
+#ifdef CAN_AVAILABLE
+    /**
+     * @brief Probe TwaiCAN for up to 5 CAN frames, relaying them if needed.
+     *
+     * @param[out] isREV True if outFrame is a REVCAN frame; false otherwise.
+     * @param[out] outFrame CanFrame from TwaiCAN
+     * @return true if a CAN frame has been read that should be acted on;
+     * @return false otherwise, use isREV to determine if CanFrame contains a REVCAN
+     * frame.
+     */
+    bool takeCANframe(bool* isREV, CanFrame* outFrame) {
+        *isREV = false;
         // Run through up to 5 messages on the CAN network.
         // If one is found to act on, break and return true.
         // If a read fails, there are no more messages to read; return false.
@@ -417,11 +420,9 @@ class VicCanController {
         // Failing to read a message (no more in queue) or finding a message we need to act on
         //    are the only cases where we break.
         // If count expires (processed 5 messages without finding one to act on), return false.
-        int count = 0;
-        while (count++, count < 5) {
+        for (int i = 0; i < 5; i++) {
             // Check CAN network for a frame
             if (!inVicCanFrame.readCan(outFrame)) {
-                *isREV = false;
                 return false;  // No CAN frame received
             }
 
@@ -448,12 +449,55 @@ class VicCanController {
             }
 
             // We have a CAN command that we should act on.
-            *isREV = false;
             return true;
         }
-// #endif
+
         return false;
     }
+#endif
+   public:
+
+    /**
+     * @brief Check for a VicCAN frame waiting to be acted on. If not CAN_AVAILABLE,
+     * then only check the Serial relay; else, check the CAN network as well.
+     *
+     * (Non-REVCAN-compatible variant)
+     *
+     * @return true upon reading a CAN frame for this MCU;
+     * @return false upon not finding a CAN frame or only reading one for a different MCU
+     */
+    inline bool readCan() {
+        if (takeQueuedSerialFrame())
+            return true;
+
+#ifdef CAN_AVAILABLE
+        bool isREV;
+        CanFrame rawFrame;
+        return takeCANframe(&isREV, &rawFrame);
+#else
+        return false;
+#endif
+    }
+
+#ifdef CAN_AVAILABLE
+    /**
+     * @brief Extends readCanFrame() to check destination of CAN Frame, relays stray CAN frames
+     * to Serial if relayMode is on, and checks for a queued frame from relayFromSerial().
+     *
+     * @param[out] isREV whether the frame read is a REV CAN frame
+     * @param[out] outFrame the raw CAN frame read, for use with REV CAN frames that need to be parsed by loop()
+     *
+     * @return true upon reading a CAN frame for this MCU;
+     * @return false upon not finding a CAN frame or only reading one for a different MCU
+     */
+    bool readCan(bool* isREV, CanFrame* outFrame) {
+        *isREV = false;  // Default value for the early return
+        if (takeQueuedSerialFrame())
+            return true;
+
+        return takeCANframe(isREV, outFrame);
+    }
+#endif
 
     /**
      * @brief Automatically parse data from incoming CanFrame into a std::vector<double>.
