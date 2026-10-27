@@ -53,8 +53,8 @@ void CAN_identifySparkMax(uint8_t deviceId) {
 }
 
 
-void CAN_setParameter(uint8_t deviceId, sparkMax_ConfigParameter parameterID,
-                      sparkMax_ParameterType type, uint32_t value) {
+void CAN_setParameter(uint8_t deviceId, sparkMax_ConfigParameter parameterID, sparkMax_ParameterType type,
+                      uint32_t value) {
     uint8_t frame[8] = {0};  // First 32 bits of frame are value, next 8 bits are type
     frame[4] = static_cast<uint8_t>(type);
 
@@ -110,7 +110,7 @@ void CAN_sendPacket(uint8_t deviceId, int32_t apiId, uint8_t data[], uint8_t dat
     createdId |= (apiId & 0x3FF) << 6;
     createdId |= (deviceId & 0x3F);
 
-#ifdef MOTOR_DEBUG
+#    ifdef MOTOR_DEBUG
     if (apiId != 0xB2) {  // Don't spam the serial monitor with heartbeats
         Serial.print("Sending to ");
         Serial.print(createdId, HEX);
@@ -123,7 +123,7 @@ void CAN_sendPacket(uint8_t deviceId, int32_t apiId, uint8_t data[], uint8_t dat
         Serial.print(millis());
         Serial.println();
     }
-#endif
+#    endif
 
     CAN_sendPacket(createdId, data, dataLen);
 }
@@ -165,17 +165,20 @@ void printREVParameter(CanFrame rxFrame) {
 
     //  uint32_t
     if (rxFrame.data[4] == static_cast<uint8_t>(sparkMax_ParameterType::kUint32)) {
-        uint32_t val = (rxFrame.data[3] << 24) | (rxFrame.data[2] << 16) | (rxFrame.data[1] << 8) | rxFrame.data[0];
+        uint32_t val =
+            (rxFrame.data[3] << 24) | (rxFrame.data[2] << 16) | (rxFrame.data[1] << 8) | rxFrame.data[0];
         Serial.print(val);
-    //  int32_t
+        //  int32_t
     } else if (rxFrame.data[4] == static_cast<uint8_t>(sparkMax_ParameterType::kInt32)) {
-        uint32_t val = (rxFrame.data[3] << 24) | (rxFrame.data[2] << 16) | (rxFrame.data[1] << 8) | rxFrame.data[0];
+        uint32_t val =
+            (rxFrame.data[3] << 24) | (rxFrame.data[2] << 16) | (rxFrame.data[1] << 8) | rxFrame.data[0];
         Serial.print(static_cast<int32_t>(val));
-    // float
+        // float
     } else if (rxFrame.data[4] == static_cast<uint8_t>(sparkMax_ParameterType::kFloat32)) {
-        uint32_t val = (rxFrame.data[3] << 24) | (rxFrame.data[2] << 16) | (rxFrame.data[1] << 8) | rxFrame.data[0];
+        uint32_t val =
+            (rxFrame.data[3] << 24) | (rxFrame.data[2] << 16) | (rxFrame.data[1] << 8) | rxFrame.data[0];
         Serial.print(*reinterpret_cast<float*>(&val));
-    // bool
+        // bool
     } else if (rxFrame.data[4] == static_cast<uint8_t>(sparkMax_ParameterType::kBool)) {
         Serial.print(rxFrame.data[0] ? "True" : "False");
     }
@@ -184,29 +187,29 @@ void printREVParameter(CanFrame rxFrame) {
     if (rxFrame.data[5] != static_cast<uint8_t>(sparkMax_paramStatus::kOK)) {
         Serial.print(" - Error: ");
         switch (static_cast<sparkMax_paramStatus>(rxFrame.data[5])) {
-        case sparkMax_paramStatus::kInvalidID:
-            Serial.print("Invalid ID");
-            break;
-        
-        case sparkMax_paramStatus::kMismatchType:
-            Serial.print("Mismatched Type");
-            break;
-        
-        case sparkMax_paramStatus::kAccessMode:
-            Serial.print("Access Mode");
-            break;
-        
-        case sparkMax_paramStatus::kInvalid:
-            Serial.print("Invalid");
-            break;
-        
-        case sparkMax_paramStatus::kNotImplementedDeprecated:
-            Serial.print("Deprecated or Not Implemented");
-            break;
-        
-        default:
-            Serial.print("Unknown");
-            break;
+            case sparkMax_paramStatus::kInvalidID:
+                Serial.print("Invalid ID");
+                break;
+
+            case sparkMax_paramStatus::kMismatchType:
+                Serial.print("Mismatched Type");
+                break;
+
+            case sparkMax_paramStatus::kAccessMode:
+                Serial.print("Access Mode");
+                break;
+
+            case sparkMax_paramStatus::kInvalid:
+                Serial.print("Invalid");
+                break;
+
+            case sparkMax_paramStatus::kNotImplementedDeprecated:
+                Serial.print("Deprecated or Not Implemented");
+                break;
+
+            default:
+                Serial.print("Unknown");
+                break;
         }
     }
 
@@ -219,7 +222,7 @@ void printREVParameter(CanFrame rxFrame) {
 //--------------------------------------------------------------------------//
 
 void CAN_sendPacket(uint32_t messageID, uint8_t data[], uint8_t dataLen) {
-#if defined(ESP32) && __has_include("ESP32-TWAI-CAN.hpp")  // ESP32
+#    if defined(ESP32) && __has_include("ESP32-TWAI-CAN.hpp")  // ESP32
     CanFrame outMsg;
     outMsg.extd = 1;  // All REV CAN messages are extended
     outMsg.data_length_code = dataLen;
@@ -227,7 +230,7 @@ void CAN_sendPacket(uint32_t messageID, uint8_t data[], uint8_t dataLen) {
     for (uint8_t i = 0; i < dataLen; i++)
         outMsg.data[i] = data[i];
     ESP32Can.writeFrame(outMsg);
-#elif defined(CORE_TEENSY) && __has_include("FlexCAN_T4.h")  // Teensy
+#    elif defined(CORE_TEENSY) && __has_include("FlexCAN_T4.h")  // Teensy
     CAN_message_t outMsg;
     outMsg.flags.extended = 1;  // All REV CAN messages are extended
     outMsg.len = dataLen;
@@ -235,7 +238,7 @@ void CAN_sendPacket(uint32_t messageID, uint8_t data[], uint8_t dataLen) {
     for (uint8_t i = 0; i < dataLen; i++)
         outMsg.buf[i] = data[i];
     Can0.write(outMsg);
-#endif  // End MCU check
+#    endif                                                       // End MCU check
 }
 
 

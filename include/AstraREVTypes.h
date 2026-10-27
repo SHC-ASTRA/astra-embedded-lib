@@ -56,7 +56,8 @@ enum class sparkMax_PeriodicFrame {
     kStatus7 = 7
 };
 
-constexpr int sparkMax_statusFrame_baseId = 0x60;  // Base ID for status frames; actual ID is base + frame number
+constexpr int sparkMax_statusFrame_baseId =
+    0x60;  // Base ID for status frames; actual ID is base + frame number
 
 struct motorStatus0 {
     double appliedOutput;

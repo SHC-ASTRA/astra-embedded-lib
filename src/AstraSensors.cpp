@@ -2,12 +2,15 @@
  * @file AstraSensors.cpp
  * @author Tristan McGinnis (tlm0047@uah.edu)
  * @brief Implements functions for using Astra's sensors
- * 
+ *
  */
 
-#if __has_include("Adafruit_BNO055.h") && __has_include("Adafruit_BMP3XX.h") && __has_include("SparkFun_u-blox_GNSS_Arduino_Library.h") && __has_include("utility/imumaths.h")
+#if __has_include("Adafruit_BNO055.h") && __has_include(                                                 \
+                                              "Adafruit_BMP3XX.h") &&                                    \
+                                              __has_include("SparkFun_u-blox_GNSS_Arduino_Library.h") && \
+                                                            __has_include("utility/imumaths.h")
 
-#include "AstraSensors.h"
+#    include "AstraSensors.h"
 
 
 void displaySensorOffsets(const adafruit_bno055_offsets_t &calibData) {
@@ -221,8 +224,7 @@ void getPosition(SFE_UBLOX_GNSS &myGNSS, double (&gps_data)[4]) {
 }
 
 String getUTC(SFE_UBLOX_GNSS &myGNSS) {
-    return String(myGNSS.getHour()) + "-" + String(myGNSS.getMinute()) + "-" +
-           String(myGNSS.getSecond());
+    return String(myGNSS.getHour()) + "-" + String(myGNSS.getMinute()) + "-" + String(myGNSS.getSecond());
 }
 
-#endif // __has_include
+#endif  // __has_include
