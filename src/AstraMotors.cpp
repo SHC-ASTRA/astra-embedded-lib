@@ -83,7 +83,8 @@ void AstraMotors::accelerate() {
         const float current = currentDutyCycle;
         const float target = targetDutyCycle;
 
-        if (abs(target - current) <= threshold) {  // if within threshold, just set it, don't gradually accelerate
+        if (abs(target - current) <=
+            threshold) {  // if within threshold, just set it, don't gradually accelerate
             currentDutyCycle = targetDutyCycle;
         } else if (current < target - threshold) {  // increment if below set
             currentDutyCycle += dutyCycleAccel;
@@ -116,8 +117,8 @@ void AstraMotors::parseStatus(uint32_t apiId, uint8_t frameIn[]) {
 
 void AstraMotors::parseStatus0(uint8_t frameIn[]) {
     // (A) Applied output is 16-bit and comes from [0] and [1]
-    uint16_t outputMSB = (frameIn[1] << 8);  // Full byte from [1]
-    uint16_t outputLSB = frameIn[0];  // Full byte from [0]
+    uint16_t outputMSB = (frameIn[1] << 8);                                       // Full byte from [1]
+    uint16_t outputLSB = frameIn[0];                                              // Full byte from [0]
     status0.appliedOutput = static_cast<float>(outputMSB | outputLSB) / 32767.0;  // No re-interpret
 
     // (bits) Faults are 16-bit and come from [2] and [3]
@@ -145,13 +146,13 @@ void AstraMotors::parseStatus1(uint8_t frameIn[]) {
     status1.motorTemperature = frameIn[4];
 
     // (V) Motor voltage is 12-bit and comes from [5] and [6]
-    uint16_t voltageMSB = ((static_cast<uint16_t>(frameIn[6]) & 0xF) << 8);  // Lower 4 bits from [6]
-    uint16_t voltageLSB = frameIn[5];  // Full byte from [5]
+    uint16_t voltageMSB = ((static_cast<uint16_t>(frameIn[6]) & 0xF) << 8);    // Lower 4 bits from [6]
+    uint16_t voltageLSB = frameIn[5];                                          // Full byte from [5]
     status1.busVoltage = static_cast<float>(voltageMSB | voltageLSB) / 128.0;  // No re-interpret
 
     // (A) Motor current is 12-bit and comes from [6] and [7]
-    uint16_t currentMSB = (static_cast<uint16_t>(frameIn[7]) << 4);  // Full byte from [7]
-    uint16_t currentLSB = ((static_cast<uint16_t>(frameIn[6]) & 0xF0) >> 4);  // Upper 4 bits from [6]
+    uint16_t currentMSB = (static_cast<uint16_t>(frameIn[7]) << 4);              // Full byte from [7]
+    uint16_t currentLSB = ((static_cast<uint16_t>(frameIn[6]) & 0xF0) >> 4);     // Upper 4 bits from [6]
     status1.outputCurrent = static_cast<float>(currentMSB | currentLSB) / 32.0;  // No re-interpret
 
     // (ms) Timestamp
@@ -173,8 +174,8 @@ void AstraMotors::parseStatus2(uint8_t frameIn[]) {
 // it will be better anyways to use inertial and visual odometry to control distance driven
 // with discrete velocity control rather than using the motor's built-in encoder when
 // driving for hundreds of meters...
-[[deprecated("Functionality removed; use closed-loop control with external sensors instead.")]]
-void AstraMotors::turnByDeg(float deg) {
+[[deprecated("Functionality removed; use closed-loop control with external sensors instead.")]] void
+AstraMotors::turnByDeg(float deg) {
     // I don't want to deal with this unused code anymore
     return;
 }
